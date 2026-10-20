@@ -154,12 +154,47 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                 </div>
               </div>
 
-              {/* Useful Details */}
-              <div className="max-w-lg mx-auto p-3.5 rounded-xl bg-[#161a26] border border-[#242938] text-xs flex justify-between text-[#8e96ac]">
-                {importResult.date_range && (
-                  <span>Coverage: <strong className="text-white">{importResult.date_range[0]}</strong> to <strong className="text-white">{importResult.date_range[1]}</strong></span>
+              {/* Distinct Accounting Breakdown */}
+              <div className="max-w-lg mx-auto p-4 rounded-xl bg-[#161a26] border border-[#242938] text-xs space-y-2.5 text-left">
+                <div className="flex items-center justify-between pb-2 border-b border-[#242938] text-[11px] text-[#8e96ac]">
+                  <span>Statement Coverage</span>
+                  <span className="font-semibold text-white">
+                    {importResult.date_range ? `${importResult.date_range[0]} to ${importResult.date_range[1]}` : 'N/A'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1">
+                    <div className="text-[11px] text-[#8e96ac]">Gross Debit Outflow</div>
+                    <div className="text-sm font-bold text-rose-300">
+                      ₹{(importResult.gross_debit_outflow ?? importResult.total_spent).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[11px] text-[#8e96ac]">Incoming Credits & P2P</div>
+                    <div className="text-sm font-bold text-emerald-400">
+                      ₹{(importResult.gross_credit_inflow ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[11px] text-[#8e96ac]">Classified Expenses</div>
+                    <div className="text-sm font-bold text-zinc-200">
+                      ₹{(importResult.classified_expenses ?? importResult.total_spent).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-[11px] text-[#8e96ac]">Net Spending</div>
+                    <div className="text-sm font-bold text-lime-400">
+                      ₹{(importResult.net_spending ?? importResult.total_spent).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                </div>
+
+                {importResult.blank_rows_skipped !== undefined && importResult.blank_rows_skipped > 0 && (
+                  <div className="text-[10px] text-[#8e96ac] pt-1">
+                    • {importResult.blank_rows_skipped} blank row(s) safely skipped
+                  </div>
                 )}
-                <span>Total Spent: <strong className="text-lime-400">₹{importResult.total_spent.toLocaleString('en-IN')}</strong></span>
               </div>
 
               {importResult.pending_questions_count > 0 && (

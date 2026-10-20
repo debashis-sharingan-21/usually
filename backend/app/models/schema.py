@@ -54,6 +54,14 @@ class CSVImportResult(BaseModel):
     pending_questions_count: int = 0
     date_range: Optional[Tuple[str, str]] = None
     total_spent: float = 0.0
+    gross_debit_outflow: float = 0.0
+    gross_credit_inflow: float = 0.0
+    classified_expenses: float = 0.0
+    transfers_outflow: float = 0.0
+    p2p_incoming: float = 0.0
+    refunds_inflow: float = 0.0
+    net_spending: float = 0.0
+    blank_rows_skipped: int = 0
 
 class HabitObservation(BaseModel):
     habit_key: str
@@ -78,6 +86,9 @@ class SpendingSummaryResponse(BaseModel):
     total_income: float
     total_refunds: float
     total_transfers: float
+    total_p2p_incoming: float = 0.0
+    gross_debit_outflow: float = 0.0
+    gross_credit_inflow: float = 0.0
     net_cash_flow: float
     transaction_count: int
     date_range: Optional[Dict[str, str]] = None
@@ -133,3 +144,5 @@ class SystemHealthResponse(BaseModel):
     is_demo_mode: bool
     pending_questions_count: int = 0
     current_tone: str = "playful"
+    active_context: str = "personal"
+    has_personal_data: bool = False

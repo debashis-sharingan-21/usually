@@ -6,6 +6,7 @@ import {
   fetchHabits,
   fetchQuestions,
   updateTone,
+  switchContext,
   seedDemoData,
   clearAllData
 } from './api/client';
@@ -72,6 +73,15 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleSwitchContext = async (targetContext: 'personal' | 'demo') => {
+    try {
+      await switchContext(targetContext);
+      await loadAll();
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     loadAll();
   }, []);
@@ -116,6 +126,7 @@ export const App: React.FC = () => {
         onClearData={handleClearData}
         isDemoLoading={isDemoLoading}
         onToneChange={handleToneChange}
+        onSwitchContext={handleSwitchContext}
       />
 
       {/* Main Container */}
@@ -287,7 +298,10 @@ export const App: React.FC = () => {
       {/* CSV Import Modal */}
       <CSVImportModal
         isOpen={isImportOpen}
-        onClose={() => setIsImportOpen(false)}
+        onClose={async () => {
+          setIsImportOpen(false);
+          await loadAll();
+        }}
         onImportSuccess={handleImportSuccess}
       />
     </div>

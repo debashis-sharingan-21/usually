@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional, List, Dict
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
-from app.database import get_connection
+from app.database import get_connection, set_active_context
 from app.services.csv_importer import parse_and_preview_csv, execute_import
 from app.models.schema import CSVPreviewResponse, CSVImportResult, TransactionUpdate
 import json
@@ -44,7 +44,7 @@ async def import_csv(
         raise HTTPException(status_code=400, detail=f"Invalid payload or CSV: {str(e)}")
 
     batch_id = f"batch_{uuid.uuid4().hex[:10]}"
-    conn = get_connection()
+    conn = get_connection("personal")
     try:
         result = execute_import(
             conn=conn,
@@ -54,6 +54,7 @@ async def import_csv(
             mapping=col_mapping,
             currency=currency
         )
+        set_active_context("personal")
         return result
     finally:
         conn.close()

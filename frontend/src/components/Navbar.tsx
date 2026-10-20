@@ -9,6 +9,7 @@ interface NavbarProps {
   onClearData: () => void;
   isDemoLoading: boolean;
   onToneChange?: (tone: 'playful' | 'dry' | 'minimal') => void;
+  onSwitchContext?: (context: 'personal' | 'demo') => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -18,6 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onClearData,
   isDemoLoading,
   onToneChange,
+  onSwitchContext,
 }) => {
   return (
     <header className="border-b border-[#242938] bg-[#0d0f17]/80 backdrop-blur sticky top-0 z-40 px-6 py-4">
@@ -56,11 +58,25 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* Demo Mode Badge if active */}
-          {health?.is_demo_mode && (
+          {/* Data Context Badge */}
+          {health?.is_demo_mode ? (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-300 font-medium">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Realistic Demo Data</span>
+              {health?.has_personal_data && (
+                <button
+                  onClick={() => onSwitchContext?.('personal')}
+                  className="ml-1 text-[11px] underline hover:text-white cursor-pointer font-bold"
+                  title="Switch back to your imported personal statement data"
+                >
+                  (Return to My Data)
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-lime-500/10 border border-lime-500/30 text-lime-300 font-medium">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Personal Data</span>
             </div>
           )}
         </div>
@@ -86,20 +102,31 @@ export const Navbar: React.FC<NavbarProps> = ({
             ))}
           </div>
 
-          <button
-            onClick={onLoadDemo}
-            disabled={isDemoLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-[#161a26] hover:bg-[#1f2536] border border-[#242938] rounded-lg transition-colors cursor-pointer"
-            title="Load 6-month realistic synthetic statement"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isDemoLoading ? 'animate-spin' : ''}`} />
-            <span>{health?.transaction_count ? 'Reload Demo' : 'Try Demo Data'}</span>
-          </button>
+          {health?.is_demo_mode ? (
+            health?.has_personal_data && (
+              <button
+                onClick={() => onSwitchContext?.('personal')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-lime-300 hover:text-lime-200 bg-lime-500/10 hover:bg-lime-500/20 border border-lime-500/30 rounded-lg transition-colors cursor-pointer"
+              >
+                <span>My Personal Data</span>
+              </button>
+            )
+          ) : (
+            <button
+              onClick={() => onSwitchContext ? onSwitchContext('demo') : onLoadDemo()}
+              disabled={isDemoLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white bg-[#161a26] hover:bg-[#1f2536] border border-[#242938] rounded-lg transition-colors cursor-pointer"
+              title="Switch to 6-month synthetic demo statement"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isDemoLoading ? 'animate-spin' : ''}`} />
+              <span>Explore Demo</span>
+            </button>
+          )}
 
           <button
             onClick={onClearData}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-lg transition-colors cursor-pointer"
-            title="Delete all transactions from local machine"
+            title="Delete transactions from the active context"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Clear</span>

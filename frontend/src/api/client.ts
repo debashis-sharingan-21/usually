@@ -26,6 +26,16 @@ export async function updateTone(tone: 'playful' | 'dry' | 'minimal') {
   return res.json();
 }
 
+export async function switchContext(context: 'personal' | 'demo') {
+  const res = await fetch(`${API_BASE}/system/context`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ context }),
+  });
+  if (!res.ok) throw new Error('Failed to switch context');
+  return res.json();
+}
+
 export async function fetchSummary(): Promise<SpendingSummaryResponse> {
   const res = await fetch(`${API_BASE}/accounting/summary`);
   if (!res.ok) throw new Error('Failed to fetch spending summary');

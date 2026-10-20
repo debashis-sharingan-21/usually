@@ -306,7 +306,7 @@ def assess_column_confidence(headers: List[str], mapping: Dict[str, str]) -> Tup
 
     return min(round(confidence, 2), 1.0), reasons
 
-def extract_rows_and_headers(csv_content: str) -> Tuple[List[str], List[List[str]], Dict[str, str]]:
+def extract_rows_and_headers(csv_content: str) -> Tuple[List[str], List[List[str]], Dict[str, str], int]:
     f = io.StringIO(csv_content)
     try:
         sample = f.read(4096)
@@ -316,14 +316,14 @@ def extract_rows_and_headers(csv_content: str) -> Tuple[List[str], List[List[str
         dialect = csv.excel
 
     reader = csv.reader(f, dialect=dialect)
-    raw_lines = [r for r in reader if r and any(c.strip() for c in r)]
+    all_raw_lines = list(reader)
 
     headers = []
     data_rows = []
     metadata = {}
     header_idx = None
 
-    for idx, r in enumerate(raw_lines):
+    for idx, r in enumerate(all_raw_lines):
         if is_header_candidate_row(r):
             header_idx = idx
             headers = [c.strip() for c in r]
@@ -336,18 +336,22 @@ def extract_rows_and_headers(csv_content: str) -> Tuple[List[str], List[List[str
                 metadata[k.strip()] = v.strip()
 
     if header_idx is None:
-        if raw_lines:
-            headers = [c.strip() for c in raw_lines[0]]
-            raw_lines = raw_lines[1:]
+        if all_raw_lines:
+            headers = [c.strip() for c in all_raw_lines[0]]
+            post_header_lines = all_raw_lines[1:]
+        else:
+            post_header_lines = []
     else:
-        raw_lines = raw_lines[header_idx + 1:]
+        post_header_lines = all_raw_lines[header_idx + 1:]
 
-    for r in raw_lines:
-        if is_footer_disclaimer_row(r):
-            continue
-        data_rows.append(r)
+    blank_rows_skipped = 0
+    for r in post_header_lines:
+        if not r or not any(c.strip() for c in r):
+            blank_rows_skipped += 1
+        else:
+            data_rows.append(r)
 
-    return headers, data_rows, metadata
+    return headers, data_rows, metadata, blank_rows_skipped
 
 def generate_fingerprint(date_str: str, clean_merchant: str, amount: float, tx_type: str, ref_id: Optional[str], occurrence_counter: int) -> str:
     ref_part = f"ref:{ref_id.strip()}" if ref_id and ref_id.strip() else f"occ:{occurrence_counter}"
@@ -359,7 +363,7 @@ def parse_and_preview_csv(
     user_mapping: Optional[Dict[str, str]] = None,
     max_preview_rows: int = 50
 ) -> Dict[str, Any]:
-    headers, all_raw_rows, metadata = extract_rows_and_headers(csv_content)
+    headers, all_raw_rows, metadata, blank_rows_skipped = extract_rows_and_headers(csv_content)
 
     if not headers:
         return {
@@ -376,6 +380,7 @@ def parse_and_preview_csv(
             "confidence_reasons": ["No recognizable header row found"],
             "detected_date_range": None,
             "sample_total_expenses": 0.0,
+            "blank_rows_skipped": blank_rows_skipped,
         }
 
     header_indices = {h: idx for idx, h in enumerate(headers)}
@@ -410,7 +415,10 @@ def parse_and_preview_csv(
         status = "valid"
         error_msg = None
 
-        if not date_col or date_col not in header_indices or header_indices[date_col] >= len(row):
+        if is_footer_disclaimer_row(row):
+            status = "error"
+            error_msg = "Incomplete record: statement notice/footer"
+        elif not date_col or date_col not in header_indices or header_indices[date_col] >= len(row):
             status = "error"
             error_msg = "Date column missing or unmapped"
         else:
@@ -493,8 +501,10 @@ def parse_and_preview_csv(
             valid_count += 1
             if parsed_date:
                 detected_dates.append(parsed_date)
-            if parsed_type in ("expense", "p2p") and parsed_amount:
+            if parsed_type == "expense" and parsed_amount:
                 sample_total_expenses += parsed_amount
+            elif parsed_type == "refund" and parsed_amount:
+                sample_total_expenses -= parsed_amount
         elif status == "ambiguous":
             ambiguous_count += 1
         else:
@@ -522,10 +532,10 @@ def parse_and_preview_csv(
     valid_ratio = valid_count / total_r if total_r > 0 else 0
     final_confidence = initial_confidence * (0.8 + 0.2 * valid_ratio)
     if error_count > 0:
-        final_confidence -= (error_count / total_r) * 0.4
+        final_confidence -= min((error_count / total_r) * 0.4, 0.1)
     final_confidence = max(0.0, min(round(final_confidence, 2), 1.0))
 
-    is_confident = (final_confidence >= 0.85 and valid_ratio >= 0.85 and error_count == 0)
+    is_confident = (final_confidence >= 0.80 and valid_ratio >= 0.90)
     needs_mapping = not is_confident
 
     return {
@@ -542,6 +552,7 @@ def parse_and_preview_csv(
         "confidence_reasons": reasons,
         "detected_date_range": date_range,
         "sample_total_expenses": round(sample_total_expenses, 2),
+        "blank_rows_skipped": blank_rows_skipped,
     }
 
 def execute_import(
@@ -552,7 +563,7 @@ def execute_import(
     mapping: Dict[str, str],
     currency: str = "INR"
 ) -> Dict[str, Any]:
-    headers, all_raw_rows, metadata = extract_rows_and_headers(csv_content)
+    headers, all_raw_rows, metadata, blank_rows_skipped = extract_rows_and_headers(csv_content)
 
     header_indices = {h: idx for idx, h in enumerate(headers)}
     date_col = mapping.get("date")
@@ -567,6 +578,13 @@ def execute_import(
     duplicate_rows = 0
     rejected_rows = 0
     errors = []
+
+    gross_debit_outflow = 0.0
+    gross_credit_inflow = 0.0
+    classified_expenses = 0.0
+    transfers_outflow = 0.0
+    p2p_incoming = 0.0
+    refunds_inflow = 0.0
 
     cur = conn.cursor()
     learned_rules = {}
@@ -587,13 +605,18 @@ def execute_import(
     transactions_to_insert = []
     now_iso = datetime.now().isoformat()
     detected_dates = []
-    total_spent_in_batch = 0.0
 
     for idx, row in enumerate(all_raw_rows):
         row_num = idx + 1
+
+        if is_footer_disclaimer_row(row):
+            rejected_rows += 1
+            errors.append({"row": row_num, "error": "Incomplete record: statement notice/footer"})
+            continue
+
         if not date_col or date_col not in header_indices or header_indices[date_col] >= len(row):
             rejected_rows += 1
-            errors.append({"row": row_num, "error": "Missing or unmapped date column"})
+            errors.append({"row": row_num, "error": "Incomplete record: missing or unmapped date column"})
             continue
 
         raw_date = row[header_indices[date_col]].strip().lstrip("\t").strip()
@@ -692,8 +715,21 @@ def execute_import(
         existing_fps.add(fp)
         accepted_rows += 1
         detected_dates.append(parsed_date)
-        if parsed_type in ("expense", "p2p"):
-            total_spent_in_batch += parsed_amount
+
+        if parsed_type == "expense":
+            gross_debit_outflow += parsed_amount
+            classified_expenses += parsed_amount
+        elif parsed_type == "transfer":
+            gross_debit_outflow += parsed_amount
+            transfers_outflow += parsed_amount
+        elif parsed_type == "refund":
+            gross_credit_inflow += parsed_amount
+            refunds_inflow += parsed_amount
+        elif parsed_type == "p2p":
+            gross_credit_inflow += parsed_amount
+            p2p_incoming += parsed_amount
+        elif parsed_type == "income":
+            gross_credit_inflow += parsed_amount
 
         transactions_to_insert.append((
             batch_id,
@@ -733,6 +769,8 @@ def execute_import(
         detected_dates.sort()
         date_range = (detected_dates[0], detected_dates[-1])
 
+    net_spending = round(classified_expenses - refunds_inflow, 2)
+
     return {
         "batch_id": batch_id,
         "filename": filename,
@@ -744,5 +782,13 @@ def execute_import(
         "newly_unlocked_habits": 0,
         "pending_questions_count": pending_q_count,
         "date_range": date_range,
-        "total_spent": round(total_spent_in_batch, 2),
+        "total_spent": net_spending,
+        "gross_debit_outflow": round(gross_debit_outflow, 2),
+        "gross_credit_inflow": round(gross_credit_inflow, 2),
+        "classified_expenses": round(classified_expenses, 2),
+        "transfers_outflow": round(transfers_outflow, 2),
+        "p2p_incoming": round(p2p_incoming, 2),
+        "refunds_inflow": round(refunds_inflow, 2),
+        "net_spending": net_spending,
+        "blank_rows_skipped": blank_rows_skipped,
     }

@@ -54,6 +54,14 @@ export interface CSVImportResult {
   pending_questions_count: number;
   date_range?: [string, string];
   total_spent: number;
+  gross_debit_outflow: number;
+  gross_credit_inflow: number;
+  classified_expenses: number;
+  transfers_outflow: number;
+  p2p_incoming: number;
+  refunds_inflow: number;
+  net_spending: number;
+  blank_rows_skipped?: number;
 }
 
 export interface HabitObservation {
@@ -80,6 +88,9 @@ export interface SpendingSummaryResponse {
   total_income: number;
   total_refunds: number;
   total_transfers: number;
+  total_p2p_incoming?: number;
+  gross_debit_outflow?: number;
+  gross_credit_inflow?: number;
   net_cash_flow: number;
   transaction_count: number;
   date_range?: { min: string; max: string };
@@ -142,4 +153,6 @@ export interface SystemHealthResponse {
   is_demo_mode: boolean;
   pending_questions_count: number;
   current_tone: 'playful' | 'dry' | 'minimal';
+  active_context?: 'personal' | 'demo';
+  has_personal_data?: boolean;
 }

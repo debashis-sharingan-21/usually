@@ -41,6 +41,17 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     """)
     total_transfers = float(cur.fetchone()[0])
 
+    # Total P2P incoming credits (money received from people)
+    cur.execute("""
+        SELECT COALESCE(SUM(amount), 0.0)
+        FROM transactions
+        WHERE type = 'p2p'
+    """)
+    total_p2p_incoming = float(cur.fetchone()[0])
+
+    gross_debit_outflow = total_expenses + total_transfers
+    gross_credit_inflow = total_income + total_refunds + total_p2p_incoming
+
     # Total transaction count
     cur.execute("SELECT COUNT(*) FROM transactions")
     tx_count = cur.fetchone()[0]
@@ -152,7 +163,10 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         "total_income": round(total_income, 2),
         "total_refunds": round(total_refunds, 2),
         "total_transfers": round(total_transfers, 2),
-        "net_cash_flow": round(total_income - total_expenses + total_refunds, 2),
+        "total_p2p_incoming": round(total_p2p_incoming, 2),
+        "gross_debit_outflow": round(gross_debit_outflow, 2),
+        "gross_credit_inflow": round(gross_credit_inflow, 2),
+        "net_cash_flow": round(total_income + total_p2p_incoming + total_refunds - total_expenses, 2),
         "transaction_count": tx_count,
         "date_range": {"min": min_date, "max": max_date} if min_date else None,
         "top_merchants": top_merchants,

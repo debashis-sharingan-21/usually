@@ -61,6 +61,7 @@ usually/
 │   │   ├── test_real_anonymized_export.py
 │   │   ├── test_persistent_learning.py
 │   │   ├── test_phonepe_export.py
+│   │   ├── test_database_isolation.py
 │   │   └── test_successive_imports.py
 │   └── requirements.txt
 ├── frontend/
@@ -130,14 +131,15 @@ Run the full suite of unit and integration tests:
 .\backend\venv\Scripts\pytest.exe backend\tests -v
 ```
 
-### Verified Test Results (20/20 passing):
+### Verified Test Results (22/22 passing):
 - `test_accounting.py`: Verifies deterministic totals, transfer exclusion from consumption expenses, refunds, and cash flow.
 - `test_csv_importer.py`: Tests date formats (`YYYY-MM-DD`, `DD/MM/YYYY`, `DD-Mon-YYYY`, ISO), amounts (commas, parentheses negatives, CR/DR), and duplicate fingerprinting.
 - `test_habits.py`: Enforces minimum evidence thresholds (sparse history suppresses habits; multi-week patterns trigger reliably; user muting suppresses alerts).
 - `test_ai_fallback.py`: Tests offline fallback to deterministic templates, and verifies that the claim validator strictly rejects hallucinated numbers.
 - `test_real_anonymized_export.py`: Validates against real anonymized bank statement formats (`Txn Date`, `Narration / Description`, `Withdrawal (Dr)`, `Deposit (Cr)`).
 - `test_persistent_learning.py`: Verifies one-tap clarification question generation, persistent rule storage, retroactive transaction re-tagging, and inheritance on future imports.
-- `test_phonepe_export.py`: Validates PhonePe statement structure (metadata preamble, tab-prefixed times, explicit Debit/Credit direction, incomplete record reporting, duplicate suppression, and tests against 467-row export).
+- `test_phonepe_export.py`: Validates PhonePe statement structure (metadata preamble, tab-prefixed times, explicit Debit/Credit direction, 471 scanned nonblank rows, 467 accepted, 4 rejected records, 1 blank row skipped, duplicate suppression, and separated financial metrics).
+- `test_database_isolation.py`: Verifies physical segregation between demo data (`usually_demo.db`) and personal data (`usually.db`), preventing synthetic demo habits from ever contaminating real user insights.
 - `test_successive_imports.py`: Validates multi-month habit evolution and pacing shifts across successive overlapping statement imports without duplicate contamination.
 
 ---

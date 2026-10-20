@@ -1,24 +1,38 @@
 import re
 import json
 import httpx
+import time
 from typing import Dict, Any, Tuple, Optional
 from app.config import OLLAMA_BASE_URL, OLLAMA_MODEL
+
+_OLLAMA_CACHE = {"timestamp": 0.0, "status": (False, "offline")}
 
 def check_ollama_status() -> Tuple[bool, str]:
     """
     Checks if Ollama is accessible locally and if the target model is available.
+    Caches the result for 5 seconds to prevent repeated network timeouts when offline.
     """
+    now = time.time()
+    if now - _OLLAMA_CACHE["timestamp"] < 5.0:
+        return _OLLAMA_CACHE["status"]
+
     try:
-        with httpx.Client(timeout=1.5) as client:
+        with httpx.Client(timeout=0.5) as client:
             resp = client.get(f"{OLLAMA_BASE_URL}/api/tags")
             if resp.status_code == 200:
                 data = resp.json()
                 models = [m.get("name", "") for m in data.get("models", [])]
                 model_found = any(OLLAMA_MODEL in m for m in models)
-                return True, (OLLAMA_MODEL if model_found else (models[0] if models else "none"))
+                res = (True, (OLLAMA_MODEL if model_found else (models[0] if models else "none")))
+                _OLLAMA_CACHE["timestamp"] = now
+                _OLLAMA_CACHE["status"] = res
+                return res
     except Exception:
         pass
-    return False, "offline"
+    res = (False, "offline")
+    _OLLAMA_CACHE["timestamp"] = now
+    _OLLAMA_CACHE["status"] = res
+    return res
 
 def generate_deterministic_observation(habit: Dict[str, Any], tone: str = "playful") -> Tuple[str, str, str]:
     """

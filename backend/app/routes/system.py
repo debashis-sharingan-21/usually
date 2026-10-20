@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.database import get_connection
+from app.database import get_connection, get_active_context, set_active_context
 from app.services.accounting import calculate_spending_summary
 from app.services.ai_generator import check_ollama_status
 from app.services.demo_data import load_realistic_demo_dataset
@@ -21,6 +21,7 @@ def get_accounting_summary():
 
 @router.get("/system/health", response_model=SystemHealthResponse)
 def get_health():
+    active_ctx = get_active_context()
     conn = get_connection()
     try:
         cur = conn.cursor()
@@ -30,10 +31,9 @@ def get_health():
         cur.execute("SELECT COUNT(*) FROM import_batches")
         batch_count = cur.fetchone()[0]
 
-        cur.execute("SELECT COUNT(*) FROM import_batches WHERE id = 'demo_batch_2026'")
-        is_demo = cur.fetchone()[0] > 0
+        is_demo = (active_ctx == "demo")
 
-        # Pending one-tap questions count
+        # Pending one-tap questions count in active context
         cur.execute("SELECT COUNT(*) FROM payee_questions WHERE status = 'pending'")
         pending_q = cur.fetchone()[0]
 
@@ -44,6 +44,17 @@ def get_health():
 
         ollama_ok, model_name = check_ollama_status()
 
+        # Check if personal data exists
+        has_personal = False
+        try:
+            p_conn = get_connection("personal")
+            p_cur = p_conn.cursor()
+            p_cur.execute("SELECT COUNT(*) FROM transactions")
+            has_personal = p_cur.fetchone()[0] > 0
+            p_conn.close()
+        except Exception:
+            pass
+
         return SystemHealthResponse(
             status="healthy",
             db_connected=True,
@@ -53,10 +64,24 @@ def get_health():
             ollama_model=model_name,
             is_demo_mode=is_demo,
             pending_questions_count=pending_q,
-            current_tone=tone_val
+            current_tone=tone_val,
+            active_context=active_ctx,
+            has_personal_data=has_personal
         )
     finally:
         conn.close()
+
+@router.get("/system/context")
+def get_context():
+    return {"active_context": get_active_context()}
+
+@router.post("/system/context")
+def switch_context(payload: dict):
+    target_context = payload.get("context", "personal")
+    if target_context not in ("personal", "demo"):
+        raise HTTPException(status_code=400, detail="Context must be 'personal' or 'demo'")
+    set_active_context(target_context)
+    return {"status": "success", "active_context": target_context}
 
 @router.put("/system/tone")
 def update_tone(payload: UserSettingsUpdate):
@@ -77,16 +102,18 @@ def update_tone(payload: UserSettingsUpdate):
 
 @router.post("/system/seed-demo")
 def seed_demo_data():
-    conn = get_connection()
+    conn = get_connection("demo")
     try:
         count = load_realistic_demo_dataset(conn)
-        return {"status": "success", "message": f"Loaded {count} realistic transactions.", "count": count}
+        set_active_context("demo")
+        return {"status": "success", "message": f"Loaded {count} realistic transactions.", "count": count, "active_context": "demo"}
     finally:
         conn.close()
 
 @router.post("/system/clear-data")
 def clear_all_data():
-    conn = get_connection()
+    active_ctx = get_active_context()
+    conn = get_connection(active_ctx)
     try:
         with conn:
             conn.execute("DELETE FROM transactions")
@@ -94,7 +121,9 @@ def clear_all_data():
             conn.execute("DELETE FROM habit_feedback")
             conn.execute("DELETE FROM learned_payees")
             conn.execute("DELETE FROM payee_questions")
-        return {"status": "success", "message": "All data cleared successfully."}
+        if active_ctx == "demo":
+            set_active_context("personal")
+        return {"status": "success", "message": f"All data cleared successfully for {active_ctx} context."}
     finally:
         conn.close()
 
