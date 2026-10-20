@@ -12,13 +12,13 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
-  RotateCcw
+  FolderOpen
 } from 'lucide-react';
 import { previewCSV, importCSV } from '../api/client';
 import type { CSVPreviewResponse, CSVImportResult } from '../types';
 import { SlothMascot } from './SlothMascot';
 
-export type ImportModalStatus =
+export type SelectionStatus =
   | 'idle'
   | 'previewing'
   | 'preview_ready'
@@ -27,27 +27,44 @@ export type ImportModalStatus =
   | 'import_error'
   | 'success';
 
+export interface AuthoritativeSelection {
+  id: string;
+  file: File;
+  fileName: string;
+  fileSize: number;
+  formattedSize: string;
+  preview: CSVPreviewResponse | null;
+  status: SelectionStatus;
+}
+
 interface CSVImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onImportSuccess: (result: CSVImportResult) => void;
 }
 
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+};
+
 export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose, onImportSuccess }) => {
-  const [status, setStatus] = useState<ImportModalStatus>('idle');
-  const [file, setFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [preview, setPreview] = useState<CSVPreviewResponse | null>(null);
+  const [selection, setSelection] = useState<AuthoritativeSelection | null>(null);
+  const activeSelectionRef = useRef<AuthoritativeSelection | null>(null);
+
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [currency] = useState('INR');
   const [importResult, setImportResult] = useState<CSVImportResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<'backend_unavailable' | 'invalid_csv' | 'empty_file' | 'general' | null>(null);
   const [showMappingManual, setShowMappingManual] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
+  // Key to force remounting a fresh native file input element on every reset/selection
+  const [fileInputKey, setFileInputKey] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const latestRequestIdRef = useRef<number>(0);
 
   // Clean state reset helper
   const resetToIdle = useCallback(() => {
@@ -55,17 +72,15 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
-    setFile(null);
-    setPreview(null);
+    activeSelectionRef.current = null;
+    setSelection(null);
     setMapping({});
     setImportResult(null);
     setErrorMsg(null);
     setErrorType(null);
     setShowMappingManual(false);
-    setStatus('idle');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setIsDragging(false);
+    setFileInputKey((k) => k + 1);
   }, []);
 
   // Safe reset when modal opens or closes
@@ -75,40 +90,58 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
+      resetToIdle();
     } else {
-      // If reopening after an error or after successful completion, reset to clean idle state
-      if (status === 'success' || status === 'preview_error') {
-        resetToIdle();
-      }
+      // Always start fresh when modal opens
+      resetToIdle();
     }
-  }, [isOpen, status, resetToIdle]);
+  }, [isOpen, resetToIdle]);
 
   if (!isOpen) return null;
 
-  const runPreview = async (selectedFile: File, userMapping?: Record<string, string>) => {
-    const currentRequestId = ++latestRequestIdRef.current;
+  const currentStatus: SelectionStatus = selection?.status || 'idle';
+
+  const runPreviewForSelection = async (
+    targetSelection: AuthoritativeSelection,
+    userMapping?: Record<string, string>
+  ) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
+
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    setStatus('previewing');
+    const previewingSel: AuthoritativeSelection = {
+      ...targetSelection,
+      status: 'previewing',
+      preview: null,
+    };
+    activeSelectionRef.current = previewingSel;
+    setSelection(previewingSel);
     setErrorMsg(null);
     setErrorType(null);
 
     try {
-      const res = await previewCSV(selectedFile, userMapping, abortController.signal);
-      if (currentRequestId !== latestRequestIdRef.current) {
-        return; // Stale request response ignored
+      const res = await previewCSV(targetSelection.file, userMapping, abortController.signal);
+      // Ensure obsolete requests from previous file selections are strictly dropped
+      if (activeSelectionRef.current?.id !== targetSelection.id) {
+        return;
       }
-      setPreview(res);
+
+      const readySel: AuthoritativeSelection = {
+        ...targetSelection,
+        preview: res,
+        status: 'preview_ready',
+      };
+      activeSelectionRef.current = readySel;
+      setSelection(readySel);
       setMapping(res.suggested_mapping);
       setShowMappingManual(!res.is_confident);
-      setStatus('preview_ready');
     } catch (err: any) {
       if (err.name === 'AbortError') return;
-      if (currentRequestId !== latestRequestIdRef.current) return;
+      if (activeSelectionRef.current?.id !== targetSelection.id) return;
 
       const rawMsg = err.message || 'Failed to inspect CSV file';
       setErrorMsg(rawMsg);
@@ -120,83 +153,163 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
       } else {
         setErrorType('general');
       }
-      setStatus('preview_error');
+
+      const errorSel: AuthoritativeSelection = {
+        ...targetSelection,
+        status: 'preview_error',
+        preview: null,
+      };
+      activeSelectionRef.current = errorSel;
+      setSelection(errorSel);
     }
   };
 
-  const handleFile = async (selectedFile: File) => {
+  const handleFileSelect = async (selectedFile: File) => {
+    // 1. Invalidate any in-flight requests immediately
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // 2. Remount input so subsequent selections of same or new file always trigger native event
+    setFileInputKey((k) => k + 1);
+
+    // 3. Validate file extension
     if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
+      resetToIdle();
       setErrorMsg('Please select a valid .csv statement export file.');
       setErrorType('invalid_csv');
-      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
+    // 4. Validate non-empty file
     if (selectedFile.size === 0) {
-      setFile(selectedFile);
+      const emptySel: AuthoritativeSelection = {
+        id: `sel_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        file: selectedFile,
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size,
+        formattedSize: '0 B',
+        preview: null,
+        status: 'preview_error',
+      };
+      activeSelectionRef.current = emptySel;
+      setSelection(emptySel);
       setErrorMsg('The selected CSV file is empty (0 bytes). Please select a statement with transaction rows.');
       setErrorType('empty_file');
-      setStatus('preview_error');
-      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
-    setFile(selectedFile);
-    setPreview(null);
+    // 5. Establish new authoritative selection
+    const selectionId = `sel_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const newSelection: AuthoritativeSelection = {
+      id: selectionId,
+      file: selectedFile,
+      fileName: selectedFile.name,
+      fileSize: selectedFile.size,
+      formattedSize: formatFileSize(selectedFile.size),
+      preview: null,
+      status: 'previewing',
+    };
+
+    activeSelectionRef.current = newSelection;
+    setSelection(newSelection);
+    setMapping({});
     setImportResult(null);
+    setErrorMsg(null);
+    setErrorType(null);
+    setShowMappingManual(false);
 
-    // Reset input value so re-selecting the exact same file in future triggers onChange
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-
-    await runPreview(selectedFile);
+    // 6. Launch preview immediately bound to this exact selection
+    await runPreviewForSelection(newSelection);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0]);
+      handleFileSelect(e.dataTransfer.files[0]);
     }
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
   const handleRetryPreview = async () => {
-    if (!file) return;
-    await runPreview(file, Object.keys(mapping).length > 0 ? mapping : undefined);
+    const currentSel = activeSelectionRef.current;
+    if (!currentSel) return;
+    await runPreviewForSelection(currentSel, Object.keys(mapping).length > 0 ? mapping : undefined);
   };
 
   const handleRemap = async (newMapping: Record<string, string>) => {
     setMapping(newMapping);
-    if (!file) return;
-    await runPreview(file, newMapping);
+    const currentSel = activeSelectionRef.current;
+    if (!currentSel) return;
+    await runPreviewForSelection(currentSel, newMapping);
   };
 
   const handleCommit = async () => {
-    if (!file || !preview || preview.valid_count === 0) return;
+    const currentSel = activeSelectionRef.current;
+    if (
+      !currentSel ||
+      currentSel.status !== 'preview_ready' ||
+      !currentSel.preview ||
+      currentSel.preview.valid_count === 0
+    ) {
+      return;
+    }
 
-    const currentRequestId = ++latestRequestIdRef.current;
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
+
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
 
-    setStatus('importing');
+    const importingSel: AuthoritativeSelection = {
+      ...currentSel,
+      status: 'importing',
+    };
+    activeSelectionRef.current = importingSel;
+    setSelection(importingSel);
     setErrorMsg(null);
     setErrorType(null);
 
     try {
-      const res = await importCSV(file, mapping, currency, abortController.signal);
-      if (currentRequestId !== latestRequestIdRef.current) return;
+      // Strictly pass currentSel.file, guaranteed to match currentSel.preview
+      const res = await importCSV(currentSel.file, mapping, currency, abortController.signal);
+      if (activeSelectionRef.current?.id !== currentSel.id) return;
+
+      const successSel: AuthoritativeSelection = {
+        ...currentSel,
+        status: 'success',
+      };
+      activeSelectionRef.current = successSel;
+      setSelection(successSel);
       setImportResult(res);
-      setStatus('success');
       onImportSuccess(res);
     } catch (err: any) {
       if (err.name === 'AbortError') return;
-      if (currentRequestId !== latestRequestIdRef.current) return;
+      if (activeSelectionRef.current?.id !== currentSel.id) return;
+
       setErrorMsg(err.message || 'Failed to import transactions');
-      setStatus('import_error');
+      const errSel: AuthoritativeSelection = {
+        ...currentSel,
+        status: 'import_error',
+      };
+      activeSelectionRef.current = errSel;
+      setSelection(errSel);
     }
   };
 
@@ -205,9 +318,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
-    if (status === 'success' || status === 'preview_error') {
-      resetToIdle();
-    }
+    resetToIdle();
     onClose();
   };
 
@@ -217,22 +328,29 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
       role="dialog"
       aria-modal="true"
       aria-labelledby="import-modal-title"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
-      {/* Hidden file input maintained in DOM across all states */}
+      {/* Fresh native file input remounted by fileInputKey */}
       <input
+        key={fileInputKey}
         ref={fileInputRef}
         type="file"
         accept=".csv"
         className="hidden"
         onChange={(e) => {
           if (e.target.files && e.target.files[0]) {
-            handleFile(e.target.files[0]);
+            handleFileSelect(e.target.files[0]);
           }
         }}
       />
 
-      <div className="bg-[#FCFBF7] border border-[#DFD9CA] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-        
+      <div
+        className={`bg-[#FCFBF7] border rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden transition-all ${
+          isDragging ? 'border-[#365844] ring-2 ring-[#365844]/30' : 'border-[#DFD9CA]'
+        }`}
+      >
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#DFD9CA] flex items-center justify-between bg-[#F7F5EE]">
           <div className="flex items-center gap-3">
@@ -244,6 +362,11 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                 <span className="font-mono text-[10px] uppercase tracking-widest text-[#365844] font-semibold">
                   Statement Intake
                 </span>
+                {selection && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA]">
+                    {selection.fileName} ({selection.formattedSize})
+                  </span>
+                )}
               </div>
               <h2 id="import-modal-title" className="font-serif text-xl font-normal text-[#292D29]">
                 Effortless Statement Import
@@ -261,19 +384,22 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto space-y-5 flex-1 text-sm bg-[#FCFBF7]">
-          
           {/* STATE 1: SUCCESS RESULT */}
-          {status === 'success' && importResult && (
+          {currentStatus === 'success' && importResult && selection && (
             <div className="space-y-5 py-4 text-center animate-fade-in">
               <div className="flex justify-center mb-1">
                 <div className="p-3 rounded-2xl bg-[#EEEBDD] border border-[#DFD9CA]">
                   <SlothMascot mood="celebrating" size={64} />
                 </div>
               </div>
-              <div>
+              <div className="space-y-1">
                 <h3 className="font-serif text-2xl font-normal text-[#292D29]">
                   Statement Processed Successfully
                 </h3>
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EEEBDD] text-[#365844] text-xs font-mono border border-[#DFD9CA]">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Imported file: {selection.fileName} ({selection.formattedSize})</span>
+                </div>
                 <p className="text-xs text-[#606860] mt-1 font-sans">
                   Transactions committed locally to SQLite. Habit engine updated with fresh longitudinal history.
                 </p>
@@ -298,7 +424,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                 </div>
               </div>
 
-              {/* Distinct Accounting Breakdown */}
+              {/* Accounting Breakdown */}
               <div className="max-w-lg mx-auto p-5 rounded-xl bg-[#F7F5EE] border border-[#DFD9CA] text-xs space-y-3 text-left">
                 <div className="flex items-center justify-between pb-2 border-b border-[#DFD9CA] text-[11px] text-[#606860]">
                   <span>Statement Coverage</span>
@@ -341,12 +467,6 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                 )}
               </div>
 
-              {importResult.pending_questions_count > 0 && (
-                <div className="p-3.5 rounded-xl bg-[#EEEBDD] border border-[#DFD9CA] text-[#365844] max-w-lg mx-auto text-xs flex items-center justify-between">
-                  <span>Usually generated {importResult.pending_questions_count} one-tap payee clarification question(s).</span>
-                </div>
-              )}
-
               <div className="pt-3">
                 <button
                   onClick={handleClose}
@@ -359,20 +479,27 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
           )}
 
           {/* STATE 2: PREVIEW ERROR / RECOVERABLE ERROR CARD */}
-          {(status === 'preview_error' || status === 'import_error') && (
+          {(currentStatus === 'preview_error' || currentStatus === 'import_error') && (
             <div className="p-5 rounded-2xl bg-[#FCFBF7] border border-[#C85A32]/30 shadow-xs space-y-4 animate-fade-in">
               <div className="flex items-start gap-3.5">
                 <div className="p-2.5 rounded-xl bg-[#C85A32]/10 text-[#C85A32] shrink-0 mt-0.5">
                   <AlertCircle className="w-5 h-5" />
                 </div>
                 <div className="space-y-1.5 flex-1">
-                  <h3 className="font-serif text-lg font-normal text-[#292D29]">
-                    {errorType === 'backend_unavailable'
-                      ? "Couldn't connect to local backend"
-                      : errorType === 'empty_file'
-                      ? "Empty statement file"
-                      : "Couldn't read this statement"}
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-serif text-lg font-normal text-[#292D29]">
+                      {errorType === 'backend_unavailable'
+                        ? "Couldn't connect to local backend"
+                        : errorType === 'empty_file'
+                        ? "Empty statement file"
+                        : "Couldn't read this statement"}
+                    </h3>
+                    {selection && (
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#F7F5EE] text-[#8A928A] border border-[#DFD9CA]">
+                        {selection.fileName} ({selection.formattedSize})
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-[#606860] leading-relaxed font-sans">
                     {errorMsg || 'The preview request failed.'}
                   </p>
@@ -384,7 +511,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
 
               {/* Recovery Actions: Retry preview · Choose another file */}
               <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-[#DFD9CA]/60">
-                {file && status === 'preview_error' && (
+                {selection && currentStatus === 'preview_error' && (
                   <button
                     onClick={handleRetryPreview}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#365844] hover:bg-[#2c4737] text-white font-medium text-xs shadow-2xs btn-tactile cursor-pointer"
@@ -393,7 +520,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                     <span>Retry preview</span>
                   </button>
                 )}
-                {file && status === 'import_error' && (
+                {selection && currentStatus === 'import_error' && (
                   <button
                     onClick={handleCommit}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#365844] hover:bg-[#2c4737] text-white font-medium text-xs shadow-2xs btn-tactile cursor-pointer"
@@ -403,21 +530,19 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                   </button>
                 )}
                 <button
-                  onClick={resetToIdle}
-                  className="px-4 py-2 rounded-xl bg-[#FCFBF7] hover:bg-[#EEEBDD] border border-[#DFD9CA] text-[#292D29] font-medium text-xs btn-tactile cursor-pointer"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FCFBF7] hover:bg-[#EEEBDD] border border-[#DFD9CA] text-[#292D29] font-medium text-xs btn-tactile cursor-pointer"
                 >
-                  Choose another file
+                  <FolderOpen className="w-3.5 h-3.5 text-[#365844]" />
+                  <span>Choose another file</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* STATE 3: DROPZONE (When idle or no file selected) */}
-          {status === 'idle' && (
+          {/* STATE 3: DROPZONE (When idle or awaiting file selection) */}
+          {currentStatus === 'idle' && (
             <div
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
               className={`border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all ${
                 isDragging
@@ -440,15 +565,19 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
             </div>
           )}
 
-          {/* STATE 4: PREVIEWING (Loading Spinner) */}
-          {status === 'previewing' && file && (
+          {/* STATE 4: PREVIEWING (Loading Spinner bound to selected file) */}
+          {currentStatus === 'previewing' && selection && (
             <div className="p-10 rounded-2xl bg-[#F7F5EE] border border-[#DFD9CA] text-center space-y-4 animate-fade-in">
               <div className="w-12 h-12 mx-auto rounded-full bg-[#EEEBDD] border border-[#DFD9CA] flex items-center justify-center text-[#365844]">
                 <RefreshCw className="w-6 h-6 animate-spin" />
               </div>
               <div className="space-y-1">
-                <h3 className="font-serif text-lg font-normal text-[#292D29]">
-                  Analyzing Statement: {file.name}
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FCFBF7] border border-[#DFD9CA] text-xs font-mono text-[#365844]">
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>{selection.fileName} ({selection.formattedSize})</span>
+                </div>
+                <h3 className="font-serif text-lg font-normal text-[#292D29] pt-1">
+                  Analyzing Statement: {selection.fileName}
                 </h3>
                 <p className="text-xs text-[#606860] font-sans">
                   Recognizing columns, header rows, debit/credit flow, and recurring counterparties...
@@ -458,10 +587,10 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
           )}
 
           {/* STATE 5: PREVIEW READY (Confidence Banner, File Bar, Table, Mapping) */}
-          {(status === 'preview_ready' || status === 'importing') && file && preview && (
+          {(currentStatus === 'preview_ready' || currentStatus === 'importing') && selection && selection.preview && (
             <div className="space-y-4 animate-fade-in">
               {/* Confidence Banner */}
-              {preview.is_confident ? (
+              {selection.preview.is_confident ? (
                 <div className="p-4 rounded-xl bg-[#EEEBDD] border border-[#DFD9CA] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-[#365844]/10 text-[#365844]">
@@ -471,28 +600,28 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                       <div className="text-sm font-semibold text-[#292D29] flex items-center gap-2">
                         <span>Format Recognized</span>
                         <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#FCFBF7] text-[#365844] font-mono border border-[#DFD9CA]">
-                          {Math.round(preview.confidence_score * 100)}% Confidence
+                          {Math.round(selection.preview.confidence_score * 100)}% Confidence
                         </span>
                       </div>
                       <p className="text-xs text-[#606860] mt-0.5 font-sans">
-                        {preview.confidence_reasons.join(' • ')}
+                        {selection.preview.confidence_reasons.join(' • ')}
                       </p>
                     </div>
                   </div>
 
                   <button
                     onClick={handleCommit}
-                    disabled={status === 'importing' || preview.valid_count === 0}
+                    disabled={currentStatus === 'importing' || selection.preview.valid_count === 0}
                     className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#365844] hover:bg-[#2c4737] text-white font-medium text-xs shadow-sm transition-all btn-tactile cursor-pointer whitespace-nowrap disabled:opacity-40"
                   >
-                    {status === 'importing' ? (
+                    {currentStatus === 'importing' ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin" />
                         <span>Importing ledger...</span>
                       </>
                     ) : (
                       <>
-                        <span>One-Click Import ({preview.valid_count} rows)</span>
+                        <span>One-Click Import ({selection.preview.valid_count} rows)</span>
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}
@@ -505,27 +634,39 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                 </div>
               )}
 
-              {/* File Info Bar */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-[#F7F5EE] border border-[#DFD9CA]">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-[#365844]" />
-                  <span className="font-medium text-[#292D29]">{file.name}</span>
-                  <span className="text-xs text-[#8A928A] font-mono">({preview.total_rows} rows found)</span>
+              {/* File Info Bar with Explicit File Details and Replace Action */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-[#F7F5EE] border border-[#DFD9CA] gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-1.5 rounded-lg bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA]">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-[#292D29] text-xs">{selection.fileName}</span>
+                      <span className="text-[11px] text-[#8A928A] font-mono">({selection.formattedSize})</span>
+                    </div>
+                    <div className="text-[11px] text-[#365844] font-mono">
+                      Preview ready · {selection.preview.valid_count} valid rows · {selection.preview.error_count} incomplete rows
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 self-end sm:self-center">
                   <button
                     onClick={() => setShowMappingManual(!showMappingManual)}
                     className="text-xs text-[#606860] hover:text-[#292D29] flex items-center gap-1 cursor-pointer"
                   >
-                    <span>{showMappingManual ? 'Hide column mapping' : 'Inspect column mapping'}</span>
+                    <span>{showMappingManual ? 'Hide mapping' : 'Inspect mapping'}</span>
                     {showMappingManual ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                   </button>
+
                   <button
-                    onClick={resetToIdle}
-                    className="text-xs text-[#8A928A] hover:text-[#292D29] underline cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 text-xs text-[#365844] hover:text-[#2c4737] font-medium bg-[#FCFBF7] hover:bg-[#EEEBDD] px-2.5 py-1 rounded-lg border border-[#DFD9CA] transition-all cursor-pointer"
+                    title="Choose a different CSV file"
                   >
-                    Change file
+                    <FolderOpen className="w-3.5 h-3.5" />
+                    <span>Replace file</span>
                   </button>
                 </div>
               </div>
@@ -549,7 +690,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                         className="w-full bg-[#FCFBF7] border border-[#DFD9CA] rounded-lg px-2.5 py-1.5 text-[#292D29] focus:outline-none focus:border-[#365844]"
                       >
                         <option value="">-- Select --</option>
-                        {preview.headers.map((h) => (
+                        {selection.preview.headers.map((h) => (
                           <option key={h} value={h}>{h}</option>
                         ))}
                       </select>
@@ -563,7 +704,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                         className="w-full bg-[#FCFBF7] border border-[#DFD9CA] rounded-lg px-2.5 py-1.5 text-[#292D29] focus:outline-none focus:border-[#365844]"
                       >
                         <option value="">-- Select --</option>
-                        {preview.headers.map((h) => (
+                        {selection.preview.headers.map((h) => (
                           <option key={h} value={h}>{h}</option>
                         ))}
                       </select>
@@ -577,7 +718,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                         className="w-full bg-[#FCFBF7] border border-[#DFD9CA] rounded-lg px-2.5 py-1.5 text-[#292D29] focus:outline-none focus:border-[#365844]"
                       >
                         <option value="">-- Select --</option>
-                        {preview.headers.map((h) => (
+                        {selection.preview.headers.map((h) => (
                           <option key={h} value={h}>{h}</option>
                         ))}
                       </select>
@@ -591,7 +732,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                         className="w-full bg-[#FCFBF7] border border-[#DFD9CA] rounded-lg px-2.5 py-1.5 text-[#292D29] focus:outline-none focus:border-[#365844]"
                       >
                         <option value="">-- Optional (e.g. Debit/Credit) --</option>
-                        {preview.headers.map((h) => (
+                        {selection.preview.headers.map((h) => (
                           <option key={h} value={h}>{h}</option>
                         ))}
                       </select>
@@ -604,19 +745,19 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
               <div className="grid grid-cols-4 gap-2 text-center text-xs">
                 <div className="p-2.5 rounded-lg bg-[#F7F5EE] border border-[#DFD9CA]">
                   <div className="text-[#8A928A] font-mono">Rows Scanned</div>
-                  <div className="font-semibold text-[#292D29] mt-0.5 font-mono">{preview.total_rows}</div>
+                  <div className="font-semibold text-[#292D29] mt-0.5 font-mono">{selection.preview.total_rows}</div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-[#F7F5EE] border border-[#365844]/30">
                   <div className="text-[#365844] font-mono">Valid Rows</div>
-                  <div className="font-semibold text-[#365844] mt-0.5 font-mono">{preview.valid_count}</div>
+                  <div className="font-semibold text-[#365844] mt-0.5 font-mono">{selection.preview.valid_count}</div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-[#F7F5EE] border border-[#C85A32]/30">
-                  <div className="text-[#C85A32] font-mono">Incomplete / Errors</div>
-                  <div className="font-semibold text-[#C85A32] mt-0.5 font-mono">{preview.error_count}</div>
+                  <div className="text-[#C85A32] font-mono">Incomplete / Notice</div>
+                  <div className="font-semibold text-[#C85A32] mt-0.5 font-mono">{selection.preview.error_count}</div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-[#F7F5EE] border border-[#DFD9CA]">
                   <div className="text-[#606860] font-mono">Ambiguous</div>
-                  <div className="font-semibold text-[#606860] mt-0.5 font-mono">{preview.ambiguous_count}</div>
+                  <div className="font-semibold text-[#606860] mt-0.5 font-mono">{selection.preview.ambiguous_count}</div>
                 </div>
               </div>
 
@@ -624,11 +765,11 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
               <div className="border border-[#DFD9CA] rounded-xl overflow-hidden bg-[#FCFBF7]">
                 <div className="px-4 py-2 bg-[#EEEBDD] border-b border-[#DFD9CA] flex items-center justify-between">
                   <span className="text-xs font-semibold text-[#292D29] font-mono">
-                    Parsed Preview (First {preview.preview_rows.length} rows)
+                    Parsed Preview (First {selection.preview.preview_rows.length} rows)
                   </span>
-                  {preview.detected_date_range && (
+                  {selection.preview.detected_date_range && (
                     <span className="text-[11px] text-[#606860] font-mono">
-                      Date range: {preview.detected_date_range[0]} to {preview.detected_date_range[1]}
+                      Date range: {selection.preview.detected_date_range[0]} to {selection.preview.detected_date_range[1]}
                     </span>
                   )}
                 </div>
@@ -646,7 +787,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#EEEBDD]">
-                      {preview.preview_rows.map((row) => (
+                      {selection.preview.preview_rows.map((row) => (
                         <tr key={row.row_index} className="hover:bg-[#F7F5EE]/70">
                           <td className="py-2 px-3 font-mono text-[#8A928A]">{row.row_index}</td>
                           <td className="py-2 px-3 font-mono text-[#606860]">{row.parsed_date || '—'}</td>
@@ -688,14 +829,14 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
         </div>
 
         {/* Footer */}
-        {status !== 'success' && (
+        {currentStatus !== 'success' && (
           <div className="px-6 py-4 border-t border-[#DFD9CA] bg-[#F7F5EE] flex items-center justify-between">
             <div className="text-xs text-[#606860] font-mono">
-              {status === 'previewing'
-                ? 'Analyzing statement format...'
-                : status === 'preview_ready'
-                ? `${preview?.valid_count ?? 0} valid records ready to commit`
-                : status === 'preview_error'
+              {currentStatus === 'previewing' && selection
+                ? `Analyzing ${selection.fileName} (${selection.formattedSize})...`
+                : currentStatus === 'preview_ready' && selection?.preview
+                ? `${selection.preview.valid_count} valid records ready to commit from ${selection.fileName}`
+                : currentStatus === 'preview_error'
                 ? 'Preview failed • Ready to retry or select another file'
                 : 'Awaiting statement file'}
             </div>
@@ -708,17 +849,17 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
               </button>
               <button
                 onClick={handleCommit}
-                disabled={status !== 'preview_ready' || !preview || preview.valid_count === 0}
+                disabled={currentStatus !== 'preview_ready' || !selection?.preview || selection.preview.valid_count === 0}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[#365844] hover:bg-[#2c4737] disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-xs shadow-sm transition-all btn-tactile cursor-pointer"
               >
-                {status === 'importing' ? (
+                {currentStatus === 'importing' ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
                     <span>Importing...</span>
                   </>
                 ) : (
                   <>
-                    <span>Confirm & Import {preview ? `(${preview.valid_count} rows)` : ''}</span>
+                    <span>Confirm & Import {selection?.preview ? `(${selection.preview.valid_count} rows)` : ''}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

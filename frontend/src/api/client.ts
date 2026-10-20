@@ -103,6 +103,7 @@ export async function previewCSV(
       method: 'POST',
       body: formData,
       signal,
+      cache: 'no-store',
     });
   } catch (err: any) {
     if (err.name === 'AbortError') {
@@ -153,6 +154,7 @@ export async function importCSV(
       method: 'POST',
       body: formData,
       signal,
+      cache: 'no-store',
     });
   } catch (err: any) {
     if (err.name === 'AbortError') {
