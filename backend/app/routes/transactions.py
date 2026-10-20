@@ -26,9 +26,12 @@ async def preview_csv(
         except Exception:
             pass
 
-    preview_result = parse_and_preview_csv(content, user_mapping=user_mapping)
-    preview_result["filename"] = file.filename
-    return preview_result
+    try:
+        preview_result = parse_and_preview_csv(content, user_mapping=user_mapping)
+        preview_result["filename"] = file.filename
+        return preview_result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse CSV statement: {str(e)}")
 
 @router.post("/import", response_model=CSVImportResult)
 async def import_csv(

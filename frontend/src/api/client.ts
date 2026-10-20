@@ -86,36 +86,94 @@ export async function dismissQuestion(question_id: string) {
   return res.json();
 }
 
-export async function previewCSV(file: File, mapping?: Record<string, string>): Promise<CSVPreviewResponse> {
+export async function previewCSV(
+  file: File,
+  mapping?: Record<string, string>,
+  signal?: AbortSignal
+): Promise<CSVPreviewResponse> {
   const formData = new FormData();
   formData.append('file', file);
   if (mapping) {
     formData.append('mapping', JSON.stringify(mapping));
   }
-  const res = await fetch(`${API_BASE}/transactions/preview`, {
-    method: 'POST',
-    body: formData,
-  });
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/transactions/preview`, {
+      method: 'POST',
+      body: formData,
+      signal,
+    });
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw err;
+    }
+    throw new Error(`Unable to reach the local backend server (${err.message || 'connection failed'}). Make sure Usually backend is running.`);
+  }
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Preview failed' }));
-    throw new Error(err.detail || 'Preview failed');
+    let errorDetail = '';
+    try {
+      const errJson = await res.json();
+      errorDetail = errJson.detail || errJson.message || '';
+    } catch {
+      try {
+        errorDetail = await res.text();
+      } catch {
+        errorDetail = '';
+      }
+    }
+    if (res.status === 404) {
+      throw new Error('CSV preview endpoint not found (HTTP 404). Check API server routes.');
+    } else if (res.status === 413) {
+      throw new Error('CSV file exceeds maximum upload size limit.');
+    } else if (res.status >= 500) {
+      throw new Error(errorDetail || `Backend error while processing CSV statement (HTTP ${res.status}).`);
+    } else {
+      throw new Error(errorDetail || `CSV preview failed with status ${res.status}.`);
+    }
   }
   return res.json();
 }
 
-export async function importCSV(file: File, mapping: Record<string, string>, currency: string = 'INR'): Promise<CSVImportResult> {
+export async function importCSV(
+  file: File,
+  mapping: Record<string, string>,
+  currency: string = 'INR',
+  signal?: AbortSignal
+): Promise<CSVImportResult> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('mapping', JSON.stringify(mapping));
   formData.append('currency', currency);
 
-  const res = await fetch(`${API_BASE}/transactions/import`, {
-    method: 'POST',
-    body: formData,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/transactions/import`, {
+      method: 'POST',
+      body: formData,
+      signal,
+    });
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw err;
+    }
+    throw new Error(`Unable to reach the local backend server (${err.message || 'connection failed'}). Make sure Usually backend is running.`);
+  }
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Import failed' }));
-    throw new Error(err.detail || 'Import failed');
+    let errorDetail = '';
+    try {
+      const errJson = await res.json();
+      errorDetail = errJson.detail || errJson.message || '';
+    } catch {
+      try {
+        errorDetail = await res.text();
+      } catch {
+        errorDetail = '';
+      }
+    }
+    throw new Error(errorDetail || `Import failed with status ${res.status}.`);
   }
   return res.json();
 }
