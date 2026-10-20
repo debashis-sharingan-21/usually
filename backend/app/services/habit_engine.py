@@ -17,8 +17,11 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
 
     Strict safeguards prevent manufacturing habits from sparse history.
     """
-    migrate_db(conn)
     cur = conn.cursor()
+    cur.execute("PRAGMA table_info(transactions)")
+    cols = [c[1] for c in cur.fetchall()]
+    if "direction" not in cols or "ref_id" not in cols:
+        migrate_db(conn)
 
     # Load feedback table to respect muted or confirmed habits
     cur.execute("SELECT habit_key, status, notes FROM habit_feedback")

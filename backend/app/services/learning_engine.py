@@ -139,6 +139,60 @@ def get_pending_questions(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
     except sqlite3.OperationalError:
         return []
 
+def apply_payee_learning(
+    conn: sqlite3.Connection,
+    payee_key: str,
+    clean_name: str,
+    category: str,
+    transaction_type: str = "expense",
+    notes: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Directly applies or updates a learned payee rule and propagates classification
+    to all matching historical transactions while preserving debit/credit direction.
+    """
+    migrate_db(conn)
+    norm_key = payee_key.strip().lower()
+    now_iso = datetime.now().isoformat()
+
+    with conn:
+        conn.execute("""
+            INSERT INTO learned_payees (payee_key, clean_name, category, transaction_type, notes, user_classified, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+            ON CONFLICT(payee_key) DO UPDATE SET
+                clean_name = excluded.clean_name,
+                category = excluded.category,
+                transaction_type = excluded.transaction_type,
+                notes = excluded.notes,
+                user_classified = 1,
+                updated_at = excluded.updated_at
+        """, (norm_key, clean_name, category, transaction_type, notes, now_iso, now_iso))
+
+        # Debits take transaction_type directly
+        conn.execute("""
+            UPDATE transactions
+            SET category = ?, type = ?, is_user_modified = 1
+            WHERE (LOWER(clean_merchant) = ? OR LOWER(raw_description) LIKE ?)
+              AND direction = 'debit'
+        """, (category, transaction_type, norm_key, f"%{norm_key}%"))
+
+        # Credits never get classified as 'expense'
+        credit_type = transaction_type if transaction_type in ('p2p', 'transfer', 'income', 'refund') else 'p2p'
+        conn.execute("""
+            UPDATE transactions
+            SET category = ?, type = ?, is_user_modified = 1
+            WHERE (LOWER(clean_merchant) = ? OR LOWER(raw_description) LIKE ?)
+              AND direction = 'credit'
+        """, (category, credit_type, norm_key, f"%{norm_key}%"))
+
+    return {
+        "status": "success",
+        "payee_key": norm_key,
+        "clean_name": clean_name,
+        "category": category,
+        "transaction_type": transaction_type
+    }
+
 def answer_payee_question(
     conn: sqlite3.Connection,
     question_id: str,

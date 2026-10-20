@@ -14,80 +14,58 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     - Gross credit inflow: all money received
     - Net cash flow: total income + p2p incoming + refunds - consumer expenses
     """
-    migrate_db(conn)
     cur = conn.cursor()
+    # Ensure migration only if needed
+    cur.execute("PRAGMA table_info(transactions)")
+    cols = [c[1] for c in cur.fetchall()]
+    if "direction" not in cols or "ref_id" not in cols:
+        migrate_db(conn)
 
-    # Total expenses (consumer debits excluding transfers)
+    # Consolidated single-pass aggregation query for all ledger totals and bounds
     cur.execute("""
-        SELECT COALESCE(SUM(amount), 0.0)
+        SELECT
+            COUNT(*),
+            MIN(date),
+            MAX(date),
+            COALESCE(SUM(CASE WHEN direction = 'debit' AND type = 'expense' AND category != 'Transfers' THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE WHEN direction = 'credit' AND type = 'income' THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE WHEN direction = 'credit' AND type = 'refund' THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE WHEN direction = 'debit' AND (type = 'transfer' OR category = 'Transfers') THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE WHEN direction = 'credit' AND (type = 'transfer' OR category = 'Transfers') THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE WHEN direction = 'debit' AND type = 'p2p' THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE WHEN direction = 'credit' AND type = 'p2p' THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE WHEN direction = 'debit' THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE 0 END), 0.0)
         FROM transactions
-        WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
     """)
-    total_expenses = float(cur.fetchone()[0])
-
-    # Total income (verified incoming earnings)
-    cur.execute("""
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE direction = 'credit' AND type = 'income'
-    """)
-    total_income = float(cur.fetchone()[0])
-
-    # Total refunds (verified merchant credits returned)
-    cur.execute("""
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE direction = 'credit' AND type = 'refund'
-    """)
-    total_refunds = float(cur.fetchone()[0])
-
-    # Total transfers (credit card payments / self transfers)
-    cur.execute("""
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE direction = 'debit' AND (type = 'transfer' OR category = 'Transfers')
-    """)
-    total_transfers = float(cur.fetchone()[0])
-
-    # Total transfers incoming (self transfers / internal deposits entering account)
-    cur.execute("""
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE direction = 'credit' AND (type = 'transfer' OR category = 'Transfers')
-    """)
-    total_transfers_in = float(cur.fetchone()[0])
-
-    # Total P2P outgoing debits (money sent to people - OUTFLOW, never counted as income)
-    cur.execute("""
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE direction = 'debit' AND type = 'p2p'
-    """)
-    total_p2p_outgoing = float(cur.fetchone()[0])
-
-    # Total P2P incoming credits (money received from people - INFLOW)
-    cur.execute("""
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE direction = 'credit' AND type = 'p2p'
-    """)
-    total_p2p_incoming = float(cur.fetchone()[0])
-
-    # Gross Debit Outflow (all money leaving the account)
-    cur.execute("""
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE direction = 'debit'
-    """)
-    gross_debit_outflow = float(cur.fetchone()[0])
-
-    # Gross Credit Inflow (all money entering the account)
-    cur.execute("""
-        SELECT COALESCE(SUM(amount), 0.0)
-        FROM transactions
-        WHERE direction = 'credit'
-    """)
-    gross_credit_inflow = float(cur.fetchone()[0])
+    agg_row = cur.fetchone()
+    (
+        tx_count,
+        min_date,
+        max_date,
+        total_expenses,
+        total_income,
+        total_refunds,
+        total_transfers,
+        total_transfers_in,
+        total_p2p_outgoing,
+        total_p2p_incoming,
+        gross_debit_outflow,
+        gross_credit_inflow
+    ) = (
+        agg_row[0] if agg_row else 0,
+        agg_row[1] if agg_row else None,
+        agg_row[2] if agg_row else None,
+        float(agg_row[3]) if agg_row else 0.0,
+        float(agg_row[4]) if agg_row else 0.0,
+        float(agg_row[5]) if agg_row else 0.0,
+        float(agg_row[6]) if agg_row else 0.0,
+        float(agg_row[7]) if agg_row else 0.0,
+        float(agg_row[8]) if agg_row else 0.0,
+        float(agg_row[9]) if agg_row else 0.0,
+        float(agg_row[10]) if agg_row else 0.0,
+        float(agg_row[11]) if agg_row else 0.0,
+    )
 
     # Reconciliation equations:
     # 1. Gross account balance change = gross credit inflow - gross debit outflow
@@ -98,16 +76,6 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     external_inflows = total_income + total_p2p_incoming + total_refunds
     consumer_margin = round(external_inflows - total_expenses, 2)
     net_cash_flow = consumer_margin
-
-    # Total transaction count
-    cur.execute("SELECT COUNT(*) FROM transactions")
-    tx_count = cur.fetchone()[0]
-
-    # Date range
-    cur.execute("SELECT MIN(date), MAX(date) FROM transactions")
-    row = cur.fetchone()
-    min_date = row[0] if row and row[0] else None
-    max_date = row[1] if row and row[1] else None
 
     # Top Merchants (consumer debit expenses only)
     cur.execute("""

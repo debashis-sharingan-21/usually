@@ -36,6 +36,8 @@ CREATE INDEX IF NOT EXISTS idx_tx_date ON transactions(date);
 CREATE INDEX IF NOT EXISTS idx_tx_merchant ON transactions(clean_merchant);
 CREATE INDEX IF NOT EXISTS idx_tx_category ON transactions(category);
 CREATE INDEX IF NOT EXISTS idx_tx_type ON transactions(type);
+CREATE INDEX IF NOT EXISTS idx_tx_batch ON transactions(import_batch_id);
+CREATE INDEX IF NOT EXISTS idx_tx_fingerprint ON transactions(fingerprint);
 
 CREATE TABLE IF NOT EXISTS habit_feedback (
     habit_key TEXT PRIMARY KEY,
@@ -175,52 +177,14 @@ def heal_and_reconcile_transactions(conn: sqlite3.Connection):
     except Exception:
         pass
 
-    # 3. Backfill ref_id for batch_05cd53ffaf if ref_id is null
+    # 3. Ensure ref_id and direction invariants are preserved
     try:
-        cur.execute("SELECT COUNT(*) FROM transactions WHERE import_batch_id = 'batch_05cd53ffaf' AND (ref_id IS NULL OR ref_id = '')")
-        need_ref = cur.fetchone()[0]
-        if need_ref > 0:
-            phonepe_path = r"C:\Users\HP\Downloads\PhonePe_Transaction_Statement.csv"
-            if os.path.exists(phonepe_path):
-                from app.services.csv_importer import (
-                    extract_rows_and_headers, 
-                    detect_column_headers, 
-                    is_footer_disclaimer_row,
-                    parse_date_safely,
-                    parse_amount_str,
-                    generate_fingerprint
-                )
-                with open(phonepe_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                headers, all_rows, meta, skipped = extract_rows_and_headers(content)
-                mapping = detect_column_headers(headers)
-                h_idx = {h: i for i, h in enumerate(headers)}
-                
-                valid_refs = []
-                for r in all_rows:
-                    if is_footer_disclaimer_row(r):
-                        continue
-                    d_raw = r[h_idx[mapping["date"]]] if mapping.get("date") in h_idx and h_idx[mapping["date"]] < len(r) else ""
-                    if not parse_date_safely(d_raw):
-                        continue
-                    desc_raw = r[h_idx[mapping["description"]]] if mapping.get("description") in h_idx and h_idx[mapping["description"]] < len(r) else ""
-                    if not desc_raw:
-                        continue
-                    amt_raw = r[h_idx[mapping["amount"]]] if mapping.get("amount") in h_idx and h_idx[mapping["amount"]] < len(r) else ""
-                    p_amt = parse_amount_str(amt_raw)
-                    if not p_amt or p_amt[0] == 0:
-                        continue
-                    ref_raw = r[h_idx[mapping["ref_id"]]] if mapping.get("ref_id") in h_idx and h_idx[mapping["ref_id"]] < len(r) else ""
-                    valid_refs.append(ref_raw)
-
-                cur.execute("SELECT id, date, clean_merchant, amount, direction, type FROM transactions WHERE import_batch_id = 'batch_05cd53ffaf' ORDER BY id ASC")
-                db_rows = cur.fetchall()
-                if len(db_rows) == len(valid_refs):
-                    for db_r, ref_val in zip(db_rows, valid_refs):
-                        tx_id, t_date, t_merchant, t_amount, t_direction, t_type = db_r
-                        new_fp = generate_fingerprint(t_date, t_merchant, t_amount, t_type, ref_val, 1, direction=t_direction)
-                        cur.execute("UPDATE transactions SET ref_id = ?, fingerprint = ? WHERE id = ?", (ref_val, new_fp, tx_id))
-                    conn.commit()
+        cur.execute("""
+            UPDATE transactions
+            SET direction = 'debit'
+            WHERE direction IS NULL OR direction = ''
+        """)
+        conn.commit()
     except Exception:
         pass
 
@@ -264,6 +228,8 @@ def migrate_db(conn: sqlite3.Connection):
 
     cur.execute("CREATE INDEX IF NOT EXISTS idx_tx_direction ON transactions(direction)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_tx_ref_id ON transactions(ref_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_tx_batch ON transactions(import_batch_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_tx_fingerprint ON transactions(fingerprint)")
     conn.commit()
 
     heal_and_reconcile_transactions(conn)
