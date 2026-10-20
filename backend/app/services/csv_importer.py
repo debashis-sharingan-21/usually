@@ -629,9 +629,14 @@ def execute_import(
         pass
 
     existing_fps = set()
+    existing_ref_keys = set()
     try:
-        cur.execute("SELECT fingerprint FROM transactions")
-        existing_fps = {row[0] for row in cur.fetchall()}
+        cur.execute("SELECT fingerprint, ref_id, direction, amount FROM transactions")
+        for row in cur.fetchall():
+            if row[0]:
+                existing_fps.add(row[0])
+            if row[1]:
+                existing_ref_keys.add((row[1], row[2], float(row[3])))
     except Exception:
         pass
 
@@ -754,17 +759,34 @@ def execute_import(
             if ref_val:
                 ref_id = ref_val
 
+        # Duplicate check 1: source transaction reference ID with direction & amount
+        ref_key = (ref_id, parsed_direction, parsed_amount) if ref_id else None
+        if ref_key and ref_key in existing_ref_keys:
+            duplicate_rows += 1
+            continue
+
         key = (parsed_date, clean_m.lower(), parsed_amount, parsed_direction, parsed_type)
         batch_occurrence[key] = batch_occurrence.get(key, 0) + 1
         occ = batch_occurrence[key]
 
         fp = generate_fingerprint(parsed_date, clean_m, parsed_amount, parsed_type, ref_id, occ, direction=parsed_direction)
 
+        # Duplicate check 2: canonical fingerprint
         if fp in existing_fps:
             duplicate_rows += 1
             continue
 
+        # Duplicate check 3: legacy fingerprints (without direction, or with default type)
+        ref_part = f"ref:{ref_id.strip()}" if ref_id and ref_id.strip() else f"occ:{occ}"
+        legacy_fp1 = hashlib.sha256(f"{parsed_date}|{clean_m.strip().lower()}|{parsed_amount:.2f}|{parsed_type.lower()}|{ref_part}".encode("utf-8")).hexdigest()
+        legacy_fp2 = hashlib.sha256(f"{parsed_date}|{clean_m.strip().lower()}|{parsed_amount:.2f}|{default_type.lower()}|{ref_part}".encode("utf-8")).hexdigest()
+        if legacy_fp1 in existing_fps or legacy_fp2 in existing_fps:
+            duplicate_rows += 1
+            continue
+
         existing_fps.add(fp)
+        if ref_key:
+            existing_ref_keys.add(ref_key)
         accepted_rows += 1
         detected_dates.append(parsed_date)
 
@@ -795,7 +817,8 @@ def execute_import(
             currency,
             fp,
             1 if clean_m.lower() in learned_rules else 0,
-            now_iso
+            now_iso,
+            ref_id
         ))
 
     with conn:
@@ -808,8 +831,8 @@ def execute_import(
             conn.executemany("""
                 INSERT INTO transactions (
                     import_batch_id, date, raw_description, clean_merchant, category,
-                    amount, direction, type, currency, fingerprint, is_user_modified, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    amount, direction, type, currency, fingerprint, is_user_modified, created_at, ref_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, transactions_to_insert)
 
     try:

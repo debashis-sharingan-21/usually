@@ -49,6 +49,14 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     """)
     total_transfers = float(cur.fetchone()[0])
 
+    # Total transfers incoming (self transfers / internal deposits entering account)
+    cur.execute("""
+        SELECT COALESCE(SUM(amount), 0.0)
+        FROM transactions
+        WHERE direction = 'credit' AND (type = 'transfer' OR category = 'Transfers')
+    """)
+    total_transfers_in = float(cur.fetchone()[0])
+
     # Total P2P outgoing debits (money sent to people - OUTFLOW, never counted as income)
     cur.execute("""
         SELECT COALESCE(SUM(amount), 0.0)
@@ -81,8 +89,15 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     """)
     gross_credit_inflow = float(cur.fetchone()[0])
 
-    # Net cash flow is net earnings after consumer expenses & refunds (excluding non-consumer transfers)
-    net_cash_flow = round(total_income + total_p2p_incoming + total_refunds - total_expenses, 2)
+    # Reconciliation equations:
+    # 1. Gross account balance change = gross credit inflow - gross debit outflow
+    net_balance_change = round(gross_credit_inflow - gross_debit_outflow, 2)
+
+    # 2. Consumer living surplus/margin = external inflows (income + p2p in + refunds) - living expenses
+    # Excludes non-consumer internal account transfers
+    external_inflows = total_income + total_p2p_incoming + total_refunds
+    consumer_margin = round(external_inflows - total_expenses, 2)
+    net_cash_flow = consumer_margin
 
     # Total transaction count
     cur.execute("SELECT COUNT(*) FROM transactions")
@@ -194,12 +209,14 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         "total_income": round(total_income, 2),
         "total_refunds": round(total_refunds, 2),
         "total_transfers": round(total_transfers, 2),
+        "total_transfers_in": round(total_transfers_in, 2),
         "total_p2p_outgoing": round(total_p2p_outgoing, 2),
         "total_p2p_incoming": round(total_p2p_incoming, 2),
         "gross_debit_outflow": round(gross_debit_outflow, 2),
         "gross_credit_inflow": round(gross_credit_inflow, 2),
         "net_cash_flow": net_cash_flow,
-        "net_balance_change": round(gross_credit_inflow - gross_debit_outflow, 2),
+        "consumer_margin": consumer_margin,
+        "net_balance_change": net_balance_change,
         "transaction_count": tx_count,
         "date_range": {"min": min_date, "max": max_date} if min_date else None,
         "top_merchants": top_merchants,

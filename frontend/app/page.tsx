@@ -151,29 +151,34 @@ export default function HomePage() {
         <div className="space-y-6">
           
           {/* Section Greeting & Statement Period */}
-          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1.5 border-b border-[#DFD9CA] pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-[#DFD9CA] pb-4">
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs uppercase tracking-widest text-[#365844] font-medium">
-                  Personal Briefing
+                  Money Briefing
                 </span>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA]">
+                <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA]">
                   {briefing.statementPeriodNote}
                 </span>
+                {briefing.isHistorical && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#FCFBF7] text-[#8A928A] border border-[#DFD9CA]">
+                    Historical Statement
+                  </span>
+                )}
               </div>
-              <h1 className="font-serif text-2xl sm:text-3xl font-normal text-[#292D29] tracking-tight mt-1">
+              <h1 className="font-serif text-2xl sm:text-3xl font-normal text-[#292D29] tracking-tight mt-1.5">
                 {briefing.greeting}
               </h1>
             </div>
 
             <p className="text-xs text-[#8A928A] font-sans">
-              Updated from {health?.transaction_count || 0} ledger records.
+              {summary ? `${summary.transaction_count} verified entries` : `${health?.transaction_count || 0} ledger records`}
             </p>
           </div>
 
           {/* Featured Observation Sheet */}
           {featured ? (
-            <article className="paper-sheet p-6 sm:p-7 space-y-4">
+            <article className="paper-sheet p-6 sm:p-8 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-[#EEEBDD] border border-[#DFD9CA]">
@@ -273,18 +278,21 @@ export default function HomePage() {
               )}
             </article>
           ) : (
-            /* Quiet State when no new habit needs attention */
-            <div className="paper-sheet p-7 text-center space-y-3">
+            /* Differentiated Quiet States */
+            <div className="paper-sheet p-8 text-center space-y-4">
               <div className="flex justify-center">
-                <SlothMascot mood="peaceful" size="md" />
+                <div className="p-3.5 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
+                  <SlothMascot mood="peaceful" size="lg" />
+                </div>
               </div>
-              <h2 className="font-serif text-2xl font-normal text-[#292D29]">
-                Nothing unusual caught my eye.
-              </h2>
-              <p className="text-sm text-[#606860] max-w-md mx-auto leading-relaxed">
-                Your spending pace and recurring cadences are consistent with historical patterns.
-                Usually is monitoring quietly in the background.
-              </p>
+              <div className="space-y-1.5 max-w-md mx-auto">
+                <h2 className="font-serif text-2xl font-normal text-[#292D29]">
+                  {briefing.quietState?.title || "Nothing unusual caught my eye."}
+                </h2>
+                <p className="text-sm text-[#606860] leading-relaxed">
+                  {briefing.quietState?.message || "Your spending pace and recurring cadences are consistent with historical patterns. Usually is monitoring quietly in the background."}
+                </p>
+              </div>
             </div>
           )}
 
@@ -318,7 +326,7 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* Compact Financial Summary (3 Numbers) */}
+          {/* Compact Financial Summary (3 Reconciled Numbers) */}
           {summary && summary.transaction_count > 0 && (
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between">
@@ -326,22 +334,22 @@ export default function HomePage() {
                   Statement Cash Flow Overview
                 </span>
                 <span className="font-mono text-[11px] text-[#8A928A]">
-                  {summary.transaction_count} transactions
+                  {summary.transaction_count} verified transactions
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Consumer Expenses */}
+                {/* Consumer Living Expenses */}
                 <div className="paper-sheet p-5 space-y-1">
                   <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
-                    <span>Consumer Expenses</span>
+                    <span>Living Expenses</span>
                     <ArrowUpRight className="w-3.5 h-3.5 text-[#C85A32]" />
                   </div>
                   <div className="text-2xl font-serif text-[#292D29]">
                     ₹{summary.total_expenses.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </div>
                   <div className="text-[11px] text-[#8A928A] font-sans">
-                    Excludes internal transfers & CC bills
+                    Purchases, dining & utilities (excludes CC payoffs)
                   </div>
                 </div>
 
@@ -352,24 +360,24 @@ export default function HomePage() {
                     <ArrowDownLeft className="w-3.5 h-3.5 text-[#365844]" />
                   </div>
                   <div className="text-2xl font-serif text-[#292D29]">
-                    ₹{((summary.gross_credit_inflow ?? summary.total_income)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    ₹{(summary.gross_credit_inflow ?? summary.total_income).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </div>
                   <div className="text-[11px] text-[#8A928A] font-sans">
-                    Income, refunds, and peer inflows
+                    Peer receipts (₹{(summary.total_p2p_incoming || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}) + transfers in
                   </div>
                 </div>
 
-                {/* Net Cash Flow */}
+                {/* Net Balance Delta */}
                 <div className="paper-sheet p-5 space-y-1">
                   <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
-                    <span>Net Surplus Margin</span>
+                    <span>Net Balance Delta</span>
                     <Coins className="w-3.5 h-3.5 text-[#365844]" />
                   </div>
-                  <div className={`text-2xl font-serif ${summary.net_cash_flow >= 0 ? 'text-[#365844]' : 'text-[#C85A32]'}`}>
-                    ₹{summary.net_cash_flow.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  <div className={`text-2xl font-serif ${(summary.net_balance_change ?? (summary.gross_credit_inflow ?? 0) - (summary.gross_debit_outflow ?? 0)) >= 0 ? 'text-[#365844]' : 'text-[#C85A32]'}`}>
+                    {(summary.net_balance_change ?? 0) >= 0 ? '+' : ''}₹{(summary.net_balance_change ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </div>
                   <div className="text-[11px] text-[#8A928A] font-sans">
-                    Earnings minus consumer spend
+                    Gross inflow minus all debit outflows
                   </div>
                 </div>
               </div>

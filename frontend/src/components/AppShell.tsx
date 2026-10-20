@@ -3,6 +3,7 @@
 import React from 'react';
 import { StatementProvider, useStatement } from '@/context/StatementContext';
 import { Navbar } from './Navbar';
+import { NotebookFooter } from './NotebookFooter';
 import { CSVImportModal } from './CSVImportModal';
 
 const ShellContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -16,23 +17,8 @@ const ShellContent: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         {children}
       </main>
 
-      {/* Editorial Colophon Footer */}
-      <footer className="border-t border-[#DFD9CA] bg-[#FCFBF7] py-6 px-4 sm:px-6 text-xs text-[#8A928A] mt-auto">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 font-sans">
-          <div className="flex items-center gap-2">
-            <span className="font-serif text-sm font-medium text-[#292D29]">Usually</span>
-            <span>—</span>
-            <span>Your Money Has Habits</span>
-          </div>
-          <div className="flex items-center gap-4 text-[11px] font-mono">
-            <span>Local SQLite</span>
-            <span>•</span>
-            <span>Zero Cloud Transmit</span>
-            <span>•</span>
-            <span>Slow and Steady</span>
-          </div>
-        </div>
-      </footer>
+      {/* Signature Notebook Footer */}
+      <NotebookFooter />
 
       {/* Shared CSV Import Modal */}
       <CSVImportModal

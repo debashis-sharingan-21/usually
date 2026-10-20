@@ -184,11 +184,23 @@ def answer_payee_question(
                 updated_at = excluded.updated_at
         """, (payee_key, payee_name, final_cat, final_type, notes, now_iso, now_iso))
 
+        # Separate updates for debits and credits to preserve directional integrity:
+        # Debits accept final_type
         conn.execute("""
             UPDATE transactions
             SET category = ?, type = ?, is_user_modified = 1
-            WHERE LOWER(clean_merchant) = ? OR LOWER(raw_description) LIKE ?
+            WHERE (LOWER(clean_merchant) = ? OR LOWER(raw_description) LIKE ?)
+              AND direction = 'debit'
         """, (final_cat, final_type, payee_key, f"%{payee_key}%"))
+
+        # Credits never get classified as 'expense'
+        credit_type = final_type if final_type in ('p2p', 'transfer', 'income', 'refund') else 'p2p'
+        conn.execute("""
+            UPDATE transactions
+            SET category = ?, type = ?, is_user_modified = 1
+            WHERE (LOWER(clean_merchant) = ? OR LOWER(raw_description) LIKE ?)
+              AND direction = 'credit'
+        """, (final_cat, credit_type, payee_key, f"%{payee_key}%"))
 
     return {
         "status": "success",

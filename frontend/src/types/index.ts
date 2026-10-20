@@ -91,11 +91,13 @@ export interface SpendingSummaryResponse {
   total_income: number;
   total_refunds: number;
   total_transfers: number;
+  total_transfers_in?: number;
   total_p2p_outgoing?: number;
   total_p2p_incoming?: number;
   gross_debit_outflow?: number;
   gross_credit_inflow?: number;
   net_cash_flow: number;
+  consumer_margin?: number;
   net_balance_change?: number;
   transaction_count: number;
   date_range?: { min: string; max: string };

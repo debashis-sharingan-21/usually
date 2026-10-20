@@ -47,6 +47,10 @@ export default function AnalysisPage() {
   const grossInflow = summary.gross_credit_inflow ?? summary.total_income;
   const grossOutflow = summary.gross_debit_outflow ?? summary.total_expenses;
   const netBalanceDelta = summary.net_balance_change ?? (grossInflow - grossOutflow);
+  const p2pIn = summary.total_p2p_incoming ?? 0;
+  const transfersIn = summary.total_transfers_in ?? 0;
+  const externalInflows = p2pIn + (summary.total_income || 0) + (summary.total_refunds || 0);
+  const consumerSurplus = summary.consumer_margin ?? (externalInflows - summary.total_expenses);
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-10 animate-fade-in">
@@ -90,72 +94,88 @@ export default function AnalysisPage() {
           {/* Consumer Expenses */}
           <div className="paper-sheet p-5 space-y-1">
             <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
-              <span>Consumer Expenses</span>
+              <span>Living Expenses</span>
               <ArrowUpRight className="w-3.5 h-3.5 text-[#C85A32]" />
             </div>
             <div className="text-2xl font-serif text-[#292D29]">
               ₹{summary.total_expenses.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </div>
             <div className="text-[11px] text-[#8A928A] font-sans">
-              Purchases, dining, utilities
+              Purchases, dining & utilities
             </div>
           </div>
 
-          {/* Transfers & CC Settlements */}
+          {/* Transfers & CC Settlements Out */}
           <div className="paper-sheet p-5 space-y-1">
             <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
-              <span>Internal Transfers</span>
+              <span>Transfers Out</span>
               <Repeat className="w-3.5 h-3.5 text-[#606860]" />
             </div>
             <div className="text-2xl font-serif text-[#606860]">
               ₹{summary.total_transfers.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </div>
             <div className="text-[11px] text-[#8A928A] font-sans">
-              CC bill settlements & self-transfers
+              CC bill payoffs & self-transfers
             </div>
           </div>
 
           {/* Total Inflows */}
           <div className="paper-sheet p-5 space-y-1">
             <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
-              <span>Total Gross Inflows</span>
+              <span>Gross Inflow</span>
               <ArrowDownLeft className="w-3.5 h-3.5 text-[#365844]" />
             </div>
             <div className="text-2xl font-serif text-[#292D29]">
               ₹{grossInflow.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </div>
             <div className="text-[11px] text-[#8A928A] font-sans">
-              Salaries, refunds & P2P incoming
+              Peer inflows (₹{p2pIn.toLocaleString('en-IN', { maximumFractionDigits: 0 })}) + transfers in
             </div>
           </div>
 
-          {/* Net Consumer Margin */}
+          {/* Gross Balance Change */}
           <div className="paper-sheet p-5 space-y-1">
             <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
-              <span>Net Surplus Margin</span>
+              <span>Account Delta</span>
               <Coins className="w-3.5 h-3.5 text-[#365844]" />
             </div>
-            <div className={`text-2xl font-serif ${summary.net_cash_flow >= 0 ? 'text-[#365844]' : 'text-[#C85A32]'}`}>
-              ₹{summary.net_cash_flow.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            <div className={`text-2xl font-serif ${netBalanceDelta >= 0 ? 'text-[#365844]' : 'text-[#C85A32]'}`}>
+              {netBalanceDelta >= 0 ? '+' : ''}₹{netBalanceDelta.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </div>
             <div className="text-[11px] text-[#8A928A] font-sans">
-              Earnings minus living spend
+              Gross inflow minus gross outflow
             </div>
           </div>
         </div>
 
         {/* Detailed Accounting Reconciliation Note */}
-        <div className="p-4 rounded-xl bg-[#FCFBF7] border border-[#DFD9CA] text-xs text-[#606860] space-y-2">
+        <div className="p-4 rounded-xl bg-[#FCFBF7] border border-[#DFD9CA] text-xs text-[#606860] space-y-3">
           <div className="flex items-center gap-1.5 font-mono text-[11px] text-[#292D29] font-medium">
             <Info className="w-3.5 h-3.5 text-[#365844]" />
-            <span>Mathematical Reconciliation</span>
+            <span>Mathematical Reconciliation & Integrity</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[12px] font-sans">
-            <div>
-              <strong className="text-[#292D29]">Net Consumer Margin:</strong> Inflows (₹{grossInflow.toLocaleString('en-IN')}) minus Living Expenses (₹{summary.total_expenses.toLocaleString('en-IN')}) = <span className="font-mono font-semibold text-[#365844]">₹{summary.net_cash_flow.toLocaleString('en-IN')}</span>.
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-[12px] font-sans">
+            <div className="space-y-1">
+              <div>
+                <strong className="text-[#292D29]">Gross Account Balance Change:</strong>
+              </div>
+              <div className="font-mono text-[11px] text-[#292D29]">
+                ₹{grossInflow.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (Gross Inflow) − ₹{grossOutflow.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (Gross Outflow) = <span className="font-semibold text-[#365844]">{netBalanceDelta >= 0 ? '+' : ''}₹{netBalanceDelta.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+              </div>
+              <p className="text-[11px] text-[#8A928A]">
+                Outflows: Living expenses (₹{summary.total_expenses.toLocaleString('en-IN', { maximumFractionDigits: 0 })}) + CC/Transfers (₹{summary.total_transfers.toLocaleString('en-IN', { maximumFractionDigits: 0 })}) + Peer outflows (₹{(summary.total_p2p_outgoing || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}).
+              </p>
             </div>
-            <div>
-              <strong className="text-[#292D29]">Total Account Balance Delta:</strong> Gross Inflows (₹{grossInflow.toLocaleString('en-IN')}) minus Gross Outflows including CC settlements (₹{grossOutflow.toLocaleString('en-IN')}) = <span className="font-mono font-semibold text-[#292D29]">₹{netBalanceDelta.toLocaleString('en-IN')}</span>.
+            <div className="space-y-1">
+              <div>
+                <strong className="text-[#292D29]">Consumer Living Surplus:</strong>
+              </div>
+              <div className="font-mono text-[11px] text-[#292D29]">
+                ₹{externalInflows.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (External Inflows) − ₹{summary.total_expenses.toLocaleString('en-IN', { maximumFractionDigits: 0 })} (Living Expenses) = <span className="font-semibold text-[#365844]">{consumerSurplus >= 0 ? '+' : ''}₹{consumerSurplus.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+              </div>
+              <p className="text-[11px] text-[#8A928A]">
+                Excludes non-consumer internal account movements (₹{transfersIn.toLocaleString('en-IN', { maximumFractionDigits: 0 })} in, ₹{summary.total_transfers.toLocaleString('en-IN', { maximumFractionDigits: 0 })} out).
+              </p>
             </div>
           </div>
         </div>

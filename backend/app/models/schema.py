@@ -89,15 +89,19 @@ class SpendingSummaryResponse(BaseModel):
     total_income: float
     total_refunds: float
     total_transfers: float
+    total_transfers_in: float = 0.0
     total_p2p_outgoing: float = 0.0
     total_p2p_incoming: float = 0.0
     gross_debit_outflow: float = 0.0
     gross_credit_inflow: float = 0.0
     net_cash_flow: float
+    consumer_margin: float = 0.0
+    net_balance_change: float = 0.0
     transaction_count: int
     date_range: Optional[Dict[str, str]] = None
     top_merchants: List[Dict[str, Any]] = []
     category_breakdown: List[Dict[str, Any]] = []
+    monthly_trends: List[Dict[str, Any]] = []
     current_month_pace: Optional[Dict[str, Any]] = None
 
 class TransactionUpdate(BaseModel):
