@@ -3,10 +3,7 @@ from app.database import get_connection, get_active_context, set_active_context
 from app.services.accounting import calculate_spending_summary
 from app.services.ai_generator import check_ollama_status
 from app.services.demo_data import load_realistic_demo_dataset
-from app.services.habit_engine import detect_habits
-from app.services.ai_generator import generate_observation_with_ai
-from app.models.schema import SpendingSummaryResponse, SystemHealthResponse, HabitObservation, UserSettingsUpdate
-from typing import List
+from app.models.schema import SpendingSummaryResponse, SystemHealthResponse, UserSettingsUpdate
 
 router = APIRouter(prefix="/api", tags=["System & Accounting"])
 

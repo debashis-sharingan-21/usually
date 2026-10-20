@@ -3,8 +3,6 @@ from typing import Dict, Any, List, Optional
 import sqlite3
 from app.database import migrate_db
 
-_SCHEMA_VERIFIED: bool = False
-
 def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     """
     Computes deterministic accounting summary combining direction and classification:
@@ -16,15 +14,12 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     - Gross credit inflow: all money received
     - Net cash flow: total income + p2p incoming + refunds - consumer expenses
     """
-    global _SCHEMA_VERIFIED
     cur = conn.cursor()
-    # Ensure migration only if needed (check once per runtime cycle)
-    if not _SCHEMA_VERIFIED:
-        cur.execute("PRAGMA table_info(transactions)")
-        cols = [c[1] for c in cur.fetchall()]
-        if "direction" not in cols or "ref_id" not in cols:
-            migrate_db(conn)
-        _SCHEMA_VERIFIED = True
+    # Ensure migration only if needed
+    cur.execute("PRAGMA table_info(transactions)")
+    cols = [c[1] for c in cur.fetchall()]
+    if "direction" not in cols or "ref_id" not in cols:
+        migrate_db(conn)
 
     # Consolidated single-pass aggregation query for all ledger totals and bounds
     cur.execute("""

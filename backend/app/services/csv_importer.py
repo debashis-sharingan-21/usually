@@ -423,6 +423,92 @@ def extract_rows_and_headers(csv_content: str) -> Tuple[List[str], List[List[str
 
     return headers, data_rows, metadata, blank_rows_skipped
 
+def parse_row_financials(
+    row: List[str],
+    header_indices: Dict[str, int],
+    mapping: Dict[str, str],
+    raw_desc: str,
+    default_type: str,
+    category: str
+) -> Tuple[Optional[float], str, str, str, Optional[str]]:
+    """
+    Unified authoritative parser for amount, direction ('debit'/'credit'), and classification ('expense'/'transfer'/'p2p'/'refund'/'income').
+    Returns (amount, direction, type, status, error_message).
+    status is 'valid', 'ambiguous', or 'error'.
+    """
+    debit_col = mapping.get("debit")
+    credit_col = mapping.get("credit")
+    amount_col = mapping.get("amount")
+    type_col = mapping.get("type")
+
+    if debit_col and credit_col and debit_col in header_indices and credit_col in header_indices:
+        raw_deb = row[header_indices[debit_col]] if header_indices[debit_col] < len(row) else ""
+        raw_cred = row[header_indices[credit_col]] if header_indices[credit_col] < len(row) else ""
+        p_deb = parse_amount_str(raw_deb)
+        p_cred = parse_amount_str(raw_cred)
+
+        has_deb = p_deb is not None and p_deb[0] > 0
+        has_cred = p_cred is not None and p_cred[0] > 0
+
+        if has_deb and not has_cred:
+            parsed_amount = p_deb[0]
+            parsed_direction = "debit"
+        elif has_cred and not has_deb:
+            parsed_amount = p_cred[0]
+            parsed_direction = "credit"
+        elif has_deb and has_cred:
+            return p_deb[0], "debit", "expense", "ambiguous", f"Both Debit ({raw_deb}) and Credit ({raw_cred}) populated"
+        else:
+            return None, "debit", "expense", "error", "Incomplete record: Debit and Credit both empty or zero"
+    elif amount_col and amount_col in header_indices:
+        raw_amt = row[header_indices[amount_col]] if header_indices[amount_col] < len(row) else ""
+        p_amt = parse_amount_str(raw_amt)
+        if not p_amt or p_amt[0] == 0:
+            return None, "debit", "expense", "error", f"Incomplete record: invalid or missing amount '{raw_amt}'"
+        abs_amt, is_neg = p_amt
+        parsed_amount = abs_amt
+
+        if type_col and type_col in header_indices and header_indices[type_col] < len(row):
+            raw_t = row[header_indices[type_col]].strip().lower()
+            if "debit" in raw_t or "dr" == raw_t:
+                parsed_direction = "debit"
+            elif "credit" in raw_t or "cr" == raw_t:
+                parsed_direction = "credit"
+            elif is_neg:
+                parsed_direction = "debit"
+            elif "received from" in raw_desc.lower():
+                parsed_direction = "credit"
+            else:
+                parsed_direction = "debit"
+        elif is_neg:
+            parsed_direction = "debit"
+        elif "received from" in raw_desc.lower():
+            parsed_direction = "credit"
+        else:
+            parsed_direction = "debit"
+    else:
+        return None, "debit", "expense", "error", "No amount column configured"
+
+    # Preserved separate classification (type)
+    if parsed_direction == "debit":
+        if default_type == "transfer" or category == "Transfers":
+            parsed_type = "transfer"
+        elif default_type == "p2p":
+            parsed_type = "p2p"
+        else:
+            parsed_type = "expense"
+    else:  # credit
+        if "refund" in raw_desc.lower() or "cashback" in raw_desc.lower() or default_type == "refund":
+            parsed_type = "refund"
+        elif default_type == "p2p" or "received from" in raw_desc.lower():
+            parsed_type = "p2p"
+        elif "salary" in raw_desc.lower() or "payroll" in raw_desc.lower() or default_type == "income":
+            parsed_type = "income"
+        else:
+            parsed_type = "income"
+
+    return parsed_amount, parsed_direction, parsed_type, "valid", None
+
 def generate_fingerprint(
     date_str: str,
     clean_merchant: str,
@@ -519,85 +605,17 @@ def parse_and_preview_csv(
         clean_m, cat, t_type = clean_merchant_and_category(raw_desc)
         parsed_merchant = clean_m
         parsed_category = cat
-        parsed_type = t_type
 
-        parsed_direction = "debit"
+        fin_amt, fin_dir, fin_type, fin_status, fin_error = parse_row_financials(
+            row, header_indices, mapping, raw_desc, t_type, cat
+        )
+        parsed_amount = fin_amt
+        parsed_direction = fin_dir
+        parsed_type = fin_type
 
         if status == "valid":
-            if debit_col and credit_col and debit_col in header_indices and credit_col in header_indices:
-                raw_deb = row[header_indices[debit_col]] if header_indices[debit_col] < len(row) else ""
-                raw_cred = row[header_indices[credit_col]] if header_indices[credit_col] < len(row) else ""
-                p_deb = parse_amount_str(raw_deb)
-                p_cred = parse_amount_str(raw_cred)
-
-                has_deb = p_deb is not None and p_deb[0] > 0
-                has_cred = p_cred is not None and p_cred[0] > 0
-
-                if has_deb and has_cred:
-                    status = "ambiguous"
-                    error_msg = f"Both Debit ({raw_deb}) and Credit ({raw_cred}) populated"
-                    parsed_amount = p_deb[0]
-                    parsed_direction = "debit"
-                    parsed_type = "expense"
-                elif has_deb:
-                    parsed_amount = p_deb[0]
-                    parsed_direction = "debit"
-                elif has_cred:
-                    parsed_amount = p_cred[0]
-                    parsed_direction = "credit"
-                else:
-                    status = "error"
-                    error_msg = "Incomplete record: zero or missing amount"
-            elif amount_col and amount_col in header_indices:
-                raw_amt = row[header_indices[amount_col]] if header_indices[amount_col] < len(row) else ""
-                amt_res = parse_amount_str(raw_amt)
-                if not amt_res or amt_res[0] == 0:
-                    status = "error"
-                    error_msg = f"Incomplete record: invalid or missing amount '{raw_amt}'"
-                else:
-                    abs_amt, is_neg = amt_res
-                    parsed_amount = abs_amt
-
-                    if type_col and type_col in header_indices and header_indices[type_col] < len(row):
-                        raw_type = row[header_indices[type_col]].strip().lower()
-                        if "debit" in raw_type or "dr" == raw_type:
-                            parsed_direction = "debit"
-                        elif "credit" in raw_type or "cr" == raw_type:
-                            parsed_direction = "credit"
-                        elif is_neg:
-                            parsed_direction = "debit"
-                        elif "received from" in raw_desc.lower():
-                            parsed_direction = "credit"
-                        else:
-                            parsed_direction = "debit"
-                    elif is_neg:
-                        parsed_direction = "debit"
-                    elif "received from" in raw_desc.lower():
-                        parsed_direction = "credit"
-                    else:
-                        parsed_direction = "debit"
-            else:
-                status = "error"
-                error_msg = "No amount column configured"
-
-            # Determine classification (type) preserved alongside direction
-            if status == "valid":
-                if parsed_direction == "debit":
-                    if t_type == "transfer" or cat == "Transfers":
-                        parsed_type = "transfer"
-                    elif t_type == "p2p":
-                        parsed_type = "p2p"
-                    else:
-                        parsed_type = "expense"
-                else:  # credit
-                    if "refund" in raw_desc.lower() or "cashback" in raw_desc.lower() or t_type == "refund":
-                        parsed_type = "refund"
-                    elif t_type == "p2p" or "received from" in raw_desc.lower():
-                        parsed_type = "p2p"
-                    elif "salary" in raw_desc.lower() or "payroll" in raw_desc.lower() or t_type == "income":
-                        parsed_type = "income"
-                    else:
-                        parsed_type = "income"
+            status = fin_status
+            error_msg = fin_error
 
         if status == "valid":
             valid_count += 1
@@ -748,82 +766,13 @@ def execute_import(
 
         clean_m, category, default_type = clean_merchant_and_category(raw_desc, learned_rules=learned_rules)
 
-        parsed_amount = None
-        parsed_direction = "debit"
-
-        if debit_col and credit_col and debit_col in header_indices and credit_col in header_indices:
-            raw_deb = row[header_indices[debit_col]] if header_indices[debit_col] < len(row) else ""
-            raw_cred = row[header_indices[credit_col]] if header_indices[credit_col] < len(row) else ""
-            p_deb = parse_amount_str(raw_deb)
-            p_cred = parse_amount_str(raw_cred)
-
-            has_deb = p_deb is not None and p_deb[0] > 0
-            has_cred = p_cred is not None and p_cred[0] > 0
-
-            if has_deb and not has_cred:
-                parsed_amount = p_deb[0]
-                parsed_direction = "debit"
-            elif has_cred and not has_deb:
-                parsed_amount = p_cred[0]
-                parsed_direction = "credit"
-            elif has_deb and has_cred:
-                rejected_rows += 1
-                errors.append({"row": row_num, "error": f"Ambiguous row: both Debit ({raw_deb}) and Credit ({raw_cred}) populated"})
-                continue
-            else:
-                rejected_rows += 1
-                errors.append({"row": row_num, "error": "Incomplete record: Debit and Credit both empty or zero"})
-                continue
-        elif amount_col and amount_col in header_indices:
-            raw_amt = row[header_indices[amount_col]] if header_indices[amount_col] < len(row) else ""
-            p_amt = parse_amount_str(raw_amt)
-            if not p_amt or p_amt[0] == 0:
-                rejected_rows += 1
-                errors.append({"row": row_num, "error": f"Incomplete record: invalid or missing amount '{raw_amt}'"})
-                continue
-            abs_amt, is_neg = p_amt
-            parsed_amount = abs_amt
-
-            if type_col and type_col in header_indices and header_indices[type_col] < len(row):
-                raw_t = row[header_indices[type_col]].strip().lower()
-                if "debit" in raw_t or "dr" == raw_t:
-                    parsed_direction = "debit"
-                elif "credit" in raw_t or "cr" == raw_t:
-                    parsed_direction = "credit"
-                elif is_neg:
-                    parsed_direction = "debit"
-                elif "received from" in raw_desc.lower():
-                    parsed_direction = "credit"
-                else:
-                    parsed_direction = "debit"
-            elif is_neg:
-                parsed_direction = "debit"
-            elif "received from" in raw_desc.lower():
-                parsed_direction = "credit"
-            else:
-                parsed_direction = "debit"
-        else:
+        parsed_amount, parsed_direction, parsed_type, fin_status, fin_error = parse_row_financials(
+            row, header_indices, mapping, raw_desc, default_type, category
+        )
+        if fin_status != "valid":
             rejected_rows += 1
-            errors.append({"row": row_num, "error": "No amount column configured"})
+            errors.append({"row": row_num, "error": fin_error or "Invalid financial data"})
             continue
-
-        # Preserve separate classification (type)
-        if parsed_direction == "debit":
-            if default_type == "transfer" or category == "Transfers":
-                parsed_type = "transfer"
-            elif default_type == "p2p":
-                parsed_type = "p2p"
-            else:
-                parsed_type = "expense"
-        else:  # credit
-            if "refund" in raw_desc.lower() or "cashback" in raw_desc.lower() or default_type == "refund":
-                parsed_type = "refund"
-            elif default_type == "p2p" or "received from" in raw_desc.lower():
-                parsed_type = "p2p"
-            elif "salary" in raw_desc.lower() or "payroll" in raw_desc.lower() or default_type == "income":
-                parsed_type = "income"
-            else:
-                parsed_type = "income"
 
         ref_id = None
         if ref_col and ref_col in header_indices and header_indices[ref_col] < len(row):
