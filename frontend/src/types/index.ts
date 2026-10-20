@@ -96,6 +96,7 @@ export interface SpendingSummaryResponse {
   gross_debit_outflow?: number;
   gross_credit_inflow?: number;
   net_cash_flow: number;
+  net_balance_change?: number;
   transaction_count: number;
   date_range?: { min: string; max: string };
   top_merchants: Array<{

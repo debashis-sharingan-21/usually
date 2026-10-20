@@ -1,373 +1,405 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import {
-  fetchHealth,
-  fetchSummary,
-  fetchNotifications,
-  fetchHabits,
-  fetchQuestions,
-  updateTone,
-  switchContext,
-  seedDemoData,
-  clearAllData
-} from '@/api/client';
-import type {
-  SystemHealthResponse,
-  SpendingSummaryResponse,
-  HabitObservation,
-  CSVImportResult,
-  PayeeQuestion
-} from '@/types';
-import { Navbar } from '@/components/Navbar';
-import { NotificationFeed } from '@/components/NotificationFeed';
-import { HabitMemoryView } from '@/components/HabitMemoryView';
-import { SpendingSummary } from '@/components/SpendingSummary';
-import { TransactionList } from '@/components/TransactionList';
-import { CSVImportModal } from '@/components/CSVImportModal';
-import { PayeeQuestionsBanner } from '@/components/PayeeQuestionsBanner';
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { useStatement } from '@/context/StatementContext';
+import { selectBriefingAndNotifications } from '@/lib/briefing';
 import { SlothMascot } from '@/components/SlothMascot';
+import { PayeeQuestionsBanner } from '@/components/PayeeQuestionsBanner';
+import { sendHabitFeedback } from '@/api/client';
 import {
   Sparkles,
-  UploadCloud,
-  Brain,
-  BarChart3,
-  ListFilter,
-  CheckCircle2,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  VolumeX,
+  Calendar,
+  Layers,
+  TrendingUp,
+  Sun,
   ShieldCheck,
-  Cpu,
-  Layers
+  UploadCloud,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Coins
 } from 'lucide-react';
 
 export default function HomePage() {
-  const [health, setHealth] = useState<SystemHealthResponse | null>(null);
-  const [summary, setSummary] = useState<SpendingSummaryResponse | null>(null);
-  const [notifications, setNotifications] = useState<HabitObservation[]>([]);
-  const [habits, setHabits] = useState<HabitObservation[]>([]);
-  const [questions, setQuestions] = useState<PayeeQuestion[]>([]);
-  const [activeTab, setActiveTab] = useState<'feed' | 'habits' | 'spending' | 'transactions'>('feed');
-  const [isImportOpen, setIsImportOpen] = useState(false);
-  const [isDemoLoading, setIsDemoLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const {
+    health,
+    summary,
+    notifications,
+    questions,
+    loading,
+    loadAll,
+    setIsImportOpen,
+    handleLoadDemo,
+    isDemoLoading
+  } = useStatement();
 
-  const loadAll = async () => {
-    try {
-      const [h, s, n, hab, q] = await Promise.all([
-        fetchHealth(),
-        fetchSummary(),
-        fetchNotifications(),
-        fetchHabits(),
-        fetchQuestions(),
-      ]);
-      setHealth(h);
-      setSummary(s);
-      setNotifications(n);
-      setHabits(hab);
-      setQuestions(q);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleToneChange = async (tone: 'playful' | 'dry' | 'minimal') => {
-    try {
-      await updateTone(tone);
-      await loadAll();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleSwitchContext = async (targetContext: 'personal' | 'demo') => {
-    try {
-      await switchContext(targetContext);
-      await loadAll();
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    loadAll();
-  }, []);
-
-  const handleLoadDemo = async () => {
-    setIsDemoLoading(true);
-    try {
-      await seedDemoData();
-      await loadAll();
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsDemoLoading(false);
-    }
-  };
-
-  const handleClearData = async () => {
-    if (window.confirm('Are you sure you want to delete all transactions and habits from local storage?')) {
-      try {
-        await clearAllData();
-        await loadAll();
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  };
-
-  const handleImportSuccess = async (_result: CSVImportResult) => {
-    await loadAll();
-    setActiveTab('feed');
-  };
+  const [expandedEvidence, setExpandedEvidence] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
 
   const hasData = (health?.transaction_count || 0) > 0;
+  const briefing = selectBriefingAndNotifications(notifications, summary);
+  const featured = briefing.featuredObservation;
+
+  const handleFeedback = async (habitKey: string, status: 'confirmed' | 'muted') => {
+    setFeedbackLoading(true);
+    try {
+      await sendHabitFeedback(habitKey, status);
+      await loadAll();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  const getHabitIcon = (type?: string) => {
+    switch (type) {
+      case 'weekday_cadence':
+        return <Calendar className="w-4 h-4 text-[#365844]" />;
+      case 'multi_month_recurrent':
+        return <Layers className="w-4 h-4 text-[#365844]" />;
+      case 'pace_shift':
+        return <TrendingUp className="w-4 h-4 text-[#985324]" />;
+      case 'weekend_surge':
+        return <Sun className="w-4 h-4 text-[#985324]" />;
+      default:
+        return <Sparkles className="w-4 h-4 text-[#365844]" />;
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#F7F5EE] text-[#292D29] flex flex-col selection:bg-[#E8C95D] selection:text-[#292D29]">
-      {/* Top Navigation */}
-      <Navbar
-        health={health}
-        onOpenImport={() => setIsImportOpen(true)}
-        onLoadDemo={handleLoadDemo}
-        onClearData={handleClearData}
-        isDemoLoading={isDemoLoading}
-        onToneChange={handleToneChange}
-        onSwitchContext={handleSwitchContext}
-      />
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-7 animate-fade-in">
+      
+      {/* Pending Payee Clarification Banner */}
+      {questions.length > 0 && (
+        <PayeeQuestionsBanner questions={questions} onAnswered={loadAll} />
+      )}
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8">
-        {!hasData && !loading ? (
-          /* Empty / Onboarding State with Sloth Personality */
-          <div className="max-w-3xl mx-auto py-10 sm:py-14 text-center space-y-8 animate-in fade-in duration-300">
-            {/* Handcrafted Sloth Companion Illustration */}
-            <div className="flex justify-center">
-              <div className="p-4 rounded-3xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
-                <SlothMascot mood="peaceful" size={96} />
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#EEEBDD] border border-[#DFD9CA] text-[11px] font-mono text-[#365844]">
-                <span>Hacktoberfest 2026</span>
-                <span>•</span>
-                <span>Themed &ldquo;Slow and Steady&rdquo;</span>
-              </div>
-
-              <h1 className="font-serif text-4xl sm:text-5xl font-normal text-[#292D29] tracking-tight leading-tight">
-                Your money has <span className="highlight-pen">habits</span>.
-              </h1>
-
-              <p className="text-base sm:text-lg text-[#606860] leading-relaxed max-w-xl mx-auto font-sans">
-                Usually is not an aggressive expense tracker or an annoying budget bot.
-                It runs quietly on your machine, learning recurring patterns and offering
-                witty, grounded observations at your own pace.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              <button
-                onClick={handleLoadDemo}
-                disabled={isDemoLoading}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#365844] hover:bg-[#2c4737] text-white font-medium text-xs tracking-wide shadow-sm transition-all cursor-pointer"
-              >
-                <Sparkles className="w-4 h-4 text-[#E8C95D]" />
-                <span>Explore with 6-Month Demo Data</span>
-              </button>
-
-              <button
-                onClick={() => setIsImportOpen(true)}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#FCFBF7] hover:bg-[#EEEBDD] border border-[#DFD9CA] text-[#292D29] font-medium text-xs tracking-wide transition-all cursor-pointer shadow-2xs"
-              >
-                <UploadCloud className="w-4 h-4 text-[#365844]" />
-                <span>Import Bank / UPI Statement</span>
-              </button>
-            </div>
-
-            {/* Architectural Notebook Box */}
-            <div className="mt-14 p-6 sm:p-8 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm text-left space-y-4">
-              <div className="flex items-center justify-between border-b border-[#EEEBDD] pb-3">
-                <span className="font-mono text-xs uppercase tracking-widest text-[#365844] font-semibold">
-                  00 / Architectural Principles
-                </span>
-                <span className="text-[11px] font-mono text-[#8A928A]">Local-First • Evidence-Grounded</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1 text-xs">
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 font-serif text-sm text-[#292D29]">
-                    <CheckCircle2 className="w-4 h-4 text-[#365844]" />
-                    <span>Deterministic Accounting</span>
-                  </div>
-                  <p className="text-[#606860] leading-relaxed pl-6">
-                    No generative AI invents sums or computes balances. Cash flows, categories, and totals are computed with verified double-entry formulas.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 font-serif text-sm text-[#292D29]">
-                    <ShieldCheck className="w-4 h-4 text-[#365844]" />
-                    <span>Zero Cloud Transmission</span>
-                  </div>
-                  <p className="text-[#606860] leading-relaxed pl-6">
-                    Raw CSVs, account numbers, and counterparties live strictly in your local SQLite database. Nothing is sent to third-party APIs.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 font-serif text-sm text-[#292D29]">
-                    <Layers className="w-4 h-4 text-[#365844]" />
-                    <span>Longitudinal Memory</span>
-                  </div>
-                  <p className="text-[#606860] leading-relaxed pl-6">
-                    Observations require strict multi-month minimum evidence. Usually waits patiently until patterns are real before speaking up.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 font-serif text-sm text-[#292D29]">
-                    <Cpu className="w-4 h-4 text-[#365844]" />
-                    <span>Honest Local AI Integration</span>
-                  </div>
-                  <p className="text-[#606860] leading-relaxed pl-6">
-                    Can use local Gemma via Ollama when available, or seamlessly fallback to reliable deterministic templates.
-                  </p>
-                </div>
-              </div>
+      {!hasData && !loading ? (
+        /* Empty / Onboarding State */
+        <div className="py-12 sm:py-16 text-center space-y-8">
+          <div className="flex justify-center">
+            <div className="p-4 rounded-3xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
+              <SlothMascot mood="peaceful" size={96} />
             </div>
           </div>
-        ) : (
-          /* Active Dashboard with Editorial Tabs */
-          <div className="space-y-7 animate-in fade-in duration-200">
-            {/* Payee Clarification Banner */}
-            {questions.length > 0 && (
-              <PayeeQuestionsBanner questions={questions} onAnswered={loadAll} />
-            )}
 
-            {/* Editorial Tab Bar */}
-            <div className="flex items-center gap-2 border-b border-[#DFD9CA] pb-3 overflow-x-auto text-xs">
-              <button
-                onClick={() => setActiveTab('feed')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'feed'
-                    ? 'bg-[#365844] text-white shadow-sm'
-                    : 'text-[#606860] hover:text-[#292D29] hover:bg-[#EEEBDD]'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Habit Feed</span>
-                {notifications.length > 0 && (
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-                    activeTab === 'feed' ? 'bg-[#2c4737] text-white' : 'bg-[#EEEBDD] text-[#365844]'
-                  }`}>
-                    {notifications.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setActiveTab('habits')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'habits'
-                    ? 'bg-[#365844] text-white shadow-sm'
-                    : 'text-[#606860] hover:text-[#292D29] hover:bg-[#EEEBDD]'
-                }`}
-              >
-                <Brain className="w-3.5 h-3.5" />
-                <span>Habit Memory</span>
-                {habits.length > 0 && (
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-                    activeTab === 'habits' ? 'bg-[#2c4737] text-white' : 'bg-[#EEEBDD] text-[#365844]'
-                  }`}>
-                    {habits.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                onClick={() => setActiveTab('spending')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'spending'
-                    ? 'bg-[#365844] text-white shadow-sm'
-                    : 'text-[#606860] hover:text-[#292D29] hover:bg-[#EEEBDD]'
-                }`}
-              >
-                <BarChart3 className="w-3.5 h-3.5" />
-                <span>Cash Flow & Pacing</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('transactions')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all cursor-pointer whitespace-nowrap ${
-                  activeTab === 'transactions'
-                    ? 'bg-[#365844] text-white shadow-sm'
-                    : 'text-[#606860] hover:text-[#292D29] hover:bg-[#EEEBDD]'
-                }`}
-              >
-                <ListFilter className="w-3.5 h-3.5" />
-                <span>Verified Ledger</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono ${
-                  activeTab === 'transactions' ? 'bg-[#2c4737] text-white' : 'bg-[#EEEBDD] text-[#606860]'
-                }`}>
-                  {health?.transaction_count || 0}
-                </span>
-              </button>
+          <div className="space-y-3.5 max-w-xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#EEEBDD] border border-[#DFD9CA] text-[11px] font-mono text-[#365844]">
+              <span>Hacktoberfest 2026</span>
+              <span>•</span>
+              <span>Themed &ldquo;Slow and Steady&rdquo;</span>
             </div>
 
-            {/* Tab Views */}
-            {activeTab === 'feed' && (
-              <div className="space-y-8">
-                <NotificationFeed notifications={notifications} onRefresh={loadAll} />
-                <div className="pt-4 border-t border-[#DFD9CA]">
-                  <SpendingSummary summary={summary} />
-                </div>
+            <h1 className="font-serif text-3xl sm:text-5xl font-normal text-[#292D29] tracking-tight leading-tight">
+              Your money has <span className="highlight-pen">habits</span>.
+            </h1>
+
+            <p className="text-sm sm:text-base text-[#606860] leading-relaxed font-sans">
+              Usually is not a generic expense tracker or an annoying budget bot.
+              It learns recurring cadences locally on your machine and delivers short,
+              grounded observations at your own pace.
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <button
+              onClick={handleLoadDemo}
+              disabled={isDemoLoading}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#365844] hover:bg-[#2c4737] text-white font-medium text-xs tracking-wide shadow-sm transition-all btn-tactile cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4 text-[#E8C95D]" />
+              <span>Explore with 6-Month Demo Data</span>
+            </button>
+
+            <button
+              onClick={() => setIsImportOpen(true)}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#FCFBF7] hover:bg-[#EEEBDD] border border-[#DFD9CA] text-[#292D29] font-medium text-xs tracking-wide transition-all btn-tactile cursor-pointer"
+            >
+              <UploadCloud className="w-4 h-4 text-[#365844]" />
+              <span>Import Bank / UPI Statement</span>
+            </button>
+          </div>
+
+          {/* Core Architectural Guarantees */}
+          <div className="pt-6 max-w-lg mx-auto text-left">
+            <div className="p-5 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] space-y-3 text-xs text-[#606860]">
+              <div className="font-mono text-[11px] font-semibold uppercase text-[#365844]">
+                Local-First Privacy Guarantees
               </div>
-            )}
-
-            {activeTab === 'habits' && (
-              <HabitMemoryView habits={habits} onRefresh={loadAll} />
-            )}
-
-            {activeTab === 'spending' && (
-              <SpendingSummary summary={summary} />
-            )}
-
-            {activeTab === 'transactions' && (
-              <TransactionList onTransactionUpdated={loadAll} />
-            )}
-          </div>
-        )}
-      </main>
-
-      {/* Editorial Colophon Footer */}
-      <footer className="border-t border-[#DFD9CA] bg-[#FCFBF7] py-6 px-4 sm:px-6 text-xs text-[#8A928A] mt-auto">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 font-sans">
-          <div className="flex items-center gap-2">
-            <span className="font-serif text-sm font-medium text-[#292D29]">Usually</span>
-            <span>—</span>
-            <span>Your Money Has Habits</span>
-          </div>
-          <div className="flex items-center gap-4 text-[11px]">
-            <span>Local-first SQLite</span>
-            <span>•</span>
-            <span>No third-party trackers</span>
-            <span>•</span>
-            <span>Hacktoberfest 2026</span>
+              <ul className="space-y-2">
+                <li className="flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#365844] shrink-0 mt-0.5" />
+                  <span><strong>Zero cloud transmit:</strong> Raw CSVs, account numbers, and transactions stay on this machine.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#365844] shrink-0 mt-0.5" />
+                  <span><strong>Deterministic math:</strong> No AI guesses amounts. Double-entry accounting verifies every sum.</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
-      </footer>
+      ) : (
+        /* Home Personal Briefing */
+        <div className="space-y-6">
+          
+          {/* Section Greeting & Statement Period */}
+          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1.5 border-b border-[#DFD9CA] pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs uppercase tracking-widest text-[#365844] font-medium">
+                  Personal Briefing
+                </span>
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA]">
+                  {briefing.statementPeriodNote}
+                </span>
+              </div>
+              <h1 className="font-serif text-2xl sm:text-3xl font-normal text-[#292D29] tracking-tight mt-1">
+                {briefing.greeting}
+              </h1>
+            </div>
 
-      {/* CSV Import Modal */}
-      <CSVImportModal
-        isOpen={isImportOpen}
-        onClose={async () => {
-          setIsImportOpen(false);
-          await loadAll();
-        }}
-        onImportSuccess={handleImportSuccess}
-      />
+            <p className="text-xs text-[#8A928A] font-sans">
+              Updated from {health?.transaction_count || 0} ledger records.
+            </p>
+          </div>
+
+          {/* Featured Observation Sheet */}
+          {featured ? (
+            <article className="paper-sheet p-6 sm:p-7 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-[#EEEBDD] border border-[#DFD9CA]">
+                    {getHabitIcon(featured.habit_type)}
+                  </div>
+                  <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#606860]">
+                    {featured.title}
+                  </span>
+                  {featured.status === 'confirmed' && (
+                    <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[#365844]/10 text-[#365844] border border-[#365844]/20">
+                      Confirmed
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 text-[11px] font-mono">
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA]">
+                    {Math.round(featured.confidence * 100)}% verified
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-[#F7F5EE] text-[#606860] border border-[#DFD9CA]">
+                    {featured.observation_window}
+                  </span>
+                </div>
+              </div>
+
+              {/* Headline with Pen Highlight */}
+              <h2 className="font-serif text-2xl sm:text-3xl font-normal text-[#292D29] tracking-tight leading-snug">
+                &ldquo;<span className="highlight-pen">{featured.headline}</span>&rdquo;
+              </h2>
+
+              {/* Message */}
+              <p className="text-sm sm:text-base text-[#404540] leading-relaxed font-sans max-w-2xl">
+                {featured.message}
+              </p>
+
+              {/* Interaction Strip */}
+              <div className="pt-3 border-t border-[#EEEBDD] flex flex-wrap items-center justify-between gap-3 text-xs">
+                <button
+                  onClick={() => setExpandedEvidence(!expandedEvidence)}
+                  className="flex items-center gap-1.5 text-[#606860] hover:text-[#292D29] font-medium transition-colors cursor-pointer"
+                >
+                  <span className="font-mono text-xs">
+                    {expandedEvidence ? 'Hide supporting evidence' : 'Inspect supporting evidence'}
+                  </span>
+                  {expandedEvidence ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleFeedback(featured.habit_key, 'confirmed')}
+                    disabled={feedbackLoading || featured.status === 'confirmed'}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all btn-tactile cursor-pointer ${
+                      featured.status === 'confirmed'
+                        ? 'bg-[#365844] text-white border border-[#365844]'
+                        : 'text-[#292D29] bg-[#FCFBF7] hover:bg-[#EEEBDD] border border-[#DFD9CA]'
+                    }`}
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{featured.status === 'confirmed' ? 'Verified' : 'Confirm'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleFeedback(featured.habit_key, 'muted')}
+                    disabled={feedbackLoading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#8A928A] hover:text-[#C85A32] bg-[#FCFBF7] hover:bg-[#C85A32]/10 border border-[#DFD9CA] transition-all btn-tactile cursor-pointer"
+                    title="Mute this topic"
+                  >
+                    <VolumeX className="w-3.5 h-3.5" />
+                    <span>Mute</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Expandable Supporting Evidence Drawer */}
+              {expandedEvidence && (
+                <div className="mt-4 p-5 bg-[#F7F5EE] border border-[#DFD9CA] rounded-xl space-y-3 animate-fade-in text-xs">
+                  <div className="flex items-center justify-between text-[#606860] border-b border-[#DFD9CA] pb-2 font-mono text-[11px]">
+                    <span className="font-medium text-[#292D29]">Supporting Evidence Facts</span>
+                    <span className="text-[#365844]">Local SQLite Verified</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-[12px]">
+                    {Object.entries(featured.evidence).map(([key, val]) => (
+                      <div key={key} className="flex justify-between border-b border-[#EEEBDD] pb-1">
+                        <span className="text-[#606860]">{key.replace(/_/g, ' ')}:</span>
+                        <span className="font-medium text-[#292D29]">
+                          {typeof val === 'boolean'
+                            ? val ? 'true' : 'false'
+                            : Array.isArray(val)
+                            ? `${val.length} dates recorded`
+                            : String(val)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </article>
+          ) : (
+            /* Quiet State when no new habit needs attention */
+            <div className="paper-sheet p-7 text-center space-y-3">
+              <div className="flex justify-center">
+                <SlothMascot mood="peaceful" size="md" />
+              </div>
+              <h2 className="font-serif text-2xl font-normal text-[#292D29]">
+                Nothing unusual caught my eye.
+              </h2>
+              <p className="text-sm text-[#606860] max-w-md mx-auto leading-relaxed">
+                Your spending pace and recurring cadences are consistent with historical patterns.
+                Usually is monitoring quietly in the background.
+              </p>
+            </div>
+          )}
+
+          {/* Secondary Observations (At most 1 or 2, compact) */}
+          {briefing.secondaryObservations.length > 0 && (
+            <div className="space-y-3">
+              <div className="text-[11px] font-mono uppercase tracking-wider text-[#8A928A]">
+                Also Observed
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {briefing.secondaryObservations.map((obs) => (
+                  <div
+                    key={obs.habit_key}
+                    className="paper-sheet-interactive p-4 flex flex-col justify-between space-y-2"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between text-[10px] font-mono text-[#8A928A] mb-1">
+                        <span className="uppercase text-[#365844]">{obs.title}</span>
+                        <span>{Math.round(obs.confidence * 100)}% verified</span>
+                      </div>
+                      <h3 className="font-serif text-base font-normal text-[#292D29]">
+                        &ldquo;{obs.headline}&rdquo;
+                      </h3>
+                      <p className="text-xs text-[#606860] mt-1 line-clamp-2">
+                        {obs.message}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Compact Financial Summary (3 Numbers) */}
+          {summary && summary.transaction_count > 0 && (
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs uppercase tracking-wider text-[#606860]">
+                  Statement Cash Flow Overview
+                </span>
+                <span className="font-mono text-[11px] text-[#8A928A]">
+                  {summary.transaction_count} transactions
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Consumer Expenses */}
+                <div className="paper-sheet p-5 space-y-1">
+                  <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
+                    <span>Consumer Expenses</span>
+                    <ArrowUpRight className="w-3.5 h-3.5 text-[#C85A32]" />
+                  </div>
+                  <div className="text-2xl font-serif text-[#292D29]">
+                    ₹{summary.total_expenses.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                  <div className="text-[11px] text-[#8A928A] font-sans">
+                    Excludes internal transfers & CC bills
+                  </div>
+                </div>
+
+                {/* Incoming Credits */}
+                <div className="paper-sheet p-5 space-y-1">
+                  <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
+                    <span>Incoming Credits</span>
+                    <ArrowDownLeft className="w-3.5 h-3.5 text-[#365844]" />
+                  </div>
+                  <div className="text-2xl font-serif text-[#292D29]">
+                    ₹{((summary.gross_credit_inflow ?? summary.total_income)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                  <div className="text-[11px] text-[#8A928A] font-sans">
+                    Income, refunds, and peer inflows
+                  </div>
+                </div>
+
+                {/* Net Cash Flow */}
+                <div className="paper-sheet p-5 space-y-1">
+                  <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
+                    <span>Net Surplus Margin</span>
+                    <Coins className="w-3.5 h-3.5 text-[#365844]" />
+                  </div>
+                  <div className={`text-2xl font-serif ${summary.net_cash_flow >= 0 ? 'text-[#365844]' : 'text-[#C85A32]'}`}>
+                    ₹{summary.net_cash_flow.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </div>
+                  <div className="text-[11px] text-[#8A928A] font-sans">
+                    Earnings minus consumer spend
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Clear Link to Full Analysis Destination */}
+          <div className="pt-2">
+            <Link
+              href="/analysis"
+              className="paper-sheet-interactive p-5 flex items-center justify-between group cursor-pointer block"
+            >
+              <div className="space-y-0.5">
+                <div className="font-serif text-lg font-normal text-[#292D29] group-hover:text-[#365844] transition-colors flex items-center gap-2">
+                  <span>Explore Detailed Analysis & Pacing</span>
+                  <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1 duration-200" />
+                </div>
+                <p className="text-xs text-[#606860] font-sans">
+                  Inspect category allocations, historical spending benchmarks, and longitudinal memory.
+                </p>
+              </div>
+
+              <span className="hidden sm:inline-block px-3 py-1.5 rounded-lg bg-[#EEEBDD] text-[#365844] text-xs font-mono font-medium">
+                View Analysis →
+              </span>
+            </Link>
+          </div>
+
+        </div>
+      )}
     </div>
   );
 }

@@ -26,7 +26,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Typography Utility Classes */
+/* Typography Utility Stacks */
 .font-serif {
   font-family: "Newsreader", "Fraunces", "Iowan Old Style", "Palatino Linotype", "Georgia", "Times New Roman", serif;
   font-optical-sizing: auto;
@@ -45,12 +45,53 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Paper & Notebook Aesthetics */
-.paper-card {
+/* Notebook Background Atmosphere */
+.notebook-ruled {
+  background-color: #F7F5EE;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 31px,
+    rgba(223, 217, 202, 0.42) 31px,
+    rgba(223, 217, 202, 0.42) 32px
+  );
+  background-size: 100% 32px;
+}
+
+.notebook-grid {
+  background-image:
+    linear-gradient(to right, rgba(223, 217, 202, 0.28) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(223, 217, 202, 0.28) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Paper Depth & Tactile Sheets */
+.paper-sheet {
   background-color: #FCFBF7;
   border: 1px solid #DFD9CA;
-  box-shadow: 0 1px 3px rgba(41, 45, 41, 0.04), 0 4px 12px rgba(41, 45, 41, 0.02);
-  border-radius: 14px;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(41, 45, 41, 0.03), 0 4px 16px rgba(41, 45, 41, 0.025);
+}
+
+.paper-sheet-interactive {
+  background-color: #FCFBF7;
+  border: 1px solid #DFD9CA;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(41, 45, 41, 0.03), 0 4px 14px rgba(41, 45, 41, 0.025);
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 180ms ease,
+              border-color 180ms ease,
+              background-color 180ms ease;
+}
+
+.paper-sheet-interactive:hover {
+  transform: translateY(-1.5px);
+  border-color: #BFB9AA;
+  box-shadow: 0 2px 6px rgba(41, 45, 41, 0.04), 0 8px 24px rgba(41, 45, 41, 0.045);
+}
+
+.paper-sheet-interactive:active {
+  transform: translateY(0);
 }
 
 .paper-card-cream {
@@ -59,32 +100,52 @@ body {
   border-radius: 14px;
 }
 
+/* Highlight Pen Accent */
 .highlight-pen {
-  background-color: rgba(232, 201, 93, 0.45);
-  padding: 0.1rem 0.35rem;
+  background-color: rgba(232, 201, 93, 0.42);
+  padding: 0.12rem 0.4rem;
   border-radius: 3px;
   display: inline;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
+  transition: background-color 200ms ease;
 }
 
-.ruled-paper-pattern {
-  background-image: repeating-linear-gradient(
-    transparent,
-    transparent 27px,
-    rgba(223, 217, 202, 0.5) 28px
-  );
-  background-size: 100% 28px;
+.highlight-pen:hover {
+  background-color: rgba(232, 201, 93, 0.6);
 }
 
-/* Fine hairline dividers */
+/* Tactile Interactive Buttons */
+.btn-tactile {
+  transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 160ms ease,
+              box-shadow 160ms ease,
+              border-color 160ms ease,
+              color 160ms ease;
+}
+
+.btn-tactile:hover {
+  transform: translateY(-0.5px);
+}
+
+.btn-tactile:active {
+  transform: translateY(0.5px) scale(0.985);
+}
+
+.btn-tactile:focus-visible {
+  outline: none;
+  ring: 2px solid #365844;
+  ring-offset: 2px;
+}
+
+/* Hairline Dividers */
 .hairline-divider {
   height: 1px;
   background-color: #DFD9CA;
   border: none;
 }
 
-/* Subtle paper scrollbars */
+/* Subtle Paper Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -101,4 +162,44 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #C8C0AF;
+}
+
+/* Entrance & Motion Keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUpShort {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-slide-up {
+  animation: slideUpShort 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Accessible Reduced-Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+    transform: none !important;
+  }
 }

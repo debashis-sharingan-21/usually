@@ -199,6 +199,7 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         "gross_debit_outflow": round(gross_debit_outflow, 2),
         "gross_credit_inflow": round(gross_credit_inflow, 2),
         "net_cash_flow": net_cash_flow,
+        "net_balance_change": round(gross_credit_inflow - gross_debit_outflow, 2),
         "transaction_count": tx_count,
         "date_range": {"min": min_date, "max": max_date} if min_date else None,
         "top_merchants": top_merchants,

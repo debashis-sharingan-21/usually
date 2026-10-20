@@ -1,226 +1,261 @@
-import React, { useState } from 'react';
-import { UploadCloud, Sparkles, ShieldCheck, RefreshCw, Trash2, Cpu, Menu, X } from 'lucide-react';
-import type { SystemHealthResponse } from '../types';
+"use client";
+
+import React, { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { SlothMascot } from './SlothMascot';
+import {
+  UploadCloud,
+  SlidersHorizontal,
+  Home,
+  BarChart3,
+  ListFilter,
+  Check,
+  Cpu,
+  Database,
+  Trash2,
+  X
+} from 'lucide-react';
+import { useStatement } from '@/context/StatementContext';
 
-interface NavbarProps {
-  health: SystemHealthResponse | null;
-  onOpenImport: () => void;
-  onLoadDemo: () => void;
-  onClearData: () => void;
-  isDemoLoading: boolean;
-  onToneChange?: (tone: 'playful' | 'dry' | 'minimal') => void;
-  onSwitchContext?: (context: 'personal' | 'demo') => void;
-}
+export const Navbar: React.FC = () => {
+  const pathname = usePathname();
+  const {
+    health,
+    setIsImportOpen,
+    handleToneChange,
+    handleSwitchContext,
+    handleClearData
+  } = useStatement();
 
-export const Navbar: React.FC<NavbarProps> = ({
-  health,
-  onOpenImport,
-  onLoadDemo,
-  onClearData,
-  isDemoLoading,
-  onToneChange,
-  onSwitchContext,
-}) => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isDiagnosticOpen, setIsDiagnosticOpen] = useState(false);
+  const diagnosticRef = useRef<HTMLDivElement>(null);
+
+  // Close diagnostic dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (diagnosticRef.current && !diagnosticRef.current.contains(e.target as Node)) {
+        setIsDiagnosticOpen(false);
+      }
+    };
+    if (isDiagnosticOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isDiagnosticOpen]);
+
+  const isDemo = health?.is_demo_mode ?? false;
+  const currentTone = health?.current_tone ?? 'playful';
+
+  const navLinks = [
+    { label: 'Home', href: '/', icon: Home },
+    { label: 'Analysis', href: '/analysis', icon: BarChart3 },
+    { label: 'Transactions', href: '/transactions', icon: ListFilter },
+  ];
 
   return (
-    <header className="border-b border-[#DFD9CA] bg-[#F7F5EE]/95 backdrop-blur sticky top-0 z-40 transition-colors">
-      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
-        {/* Brand identity */}
-        <div className="flex items-center gap-3">
-          <SlothMascot size="md" variant="calm" />
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-serif text-2xl tracking-tight text-[#292D29] font-medium leading-none">
-                Usually
-              </span>
-              <span className="text-[10px] tracking-widest uppercase font-mono px-2 py-0.5 rounded-full bg-[#EEEBDD] text-[#606860] border border-[#DFD9CA]">
-                slow & steady
-              </span>
-            </div>
-            <p className="text-[11px] text-[#8A928A] tracking-tight font-sans mt-0.5">
-              Your money has habits
-            </p>
-          </div>
-        </div>
-
-        {/* Desktop Center Badges */}
-        <div className="hidden lg:flex items-center gap-2.5 text-xs">
-          {/* Privacy status */}
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FCFBF7] border border-[#DFD9CA] text-[#606860]">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#365844]" />
-            <span className="font-sans">100% On-Device • Local SQLite</span>
+    <>
+      <header className="sticky top-0 z-40 bg-[#FCFBF7]/95 backdrop-blur-md border-b border-[#DFD9CA] transition-all">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-15 flex items-center justify-between">
+          
+          {/* Left: Brand Identity */}
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <SlothMascot mood="peaceful" size="sm" className="transition-transform group-hover:scale-105 duration-200" />
+              <div className="flex flex-col">
+                <span className="font-serif text-lg font-medium text-[#292D29] tracking-tight leading-none">
+                  Usually
+                </span>
+                <span className="text-[10px] text-[#8A928A] tracking-wide font-sans hidden sm:inline">
+                  Your money has habits
+                </span>
+              </div>
+            </Link>
           </div>
 
-          {/* AI / Fallback status */}
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FCFBF7] border border-[#DFD9CA] text-[#606860]">
-            <Cpu className="w-3.5 h-3.5 text-[#365844]" />
-            {health?.ollama_available ? (
-              <span className="font-sans font-medium text-[#365844]">Ollama: {health.ollama_model}</span>
-            ) : (
-              <span className="font-sans">Deterministic Rule Engine</span>
-            )}
-          </div>
-
-          {/* Context status */}
-          {health?.is_demo_mode ? (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E8C95D]/25 border border-[#E8C95D] text-[#292D29] font-medium">
-              <Sparkles className="w-3.5 h-3.5 text-[#9E8224]" />
-              <span className="font-sans">Demo Notebook</span>
-              {health?.has_personal_data && (
-                <button
-                  onClick={() => onSwitchContext?.('personal')}
-                  className="ml-1 text-[11px] underline hover:text-[#365844] cursor-pointer font-semibold"
-                  title="Switch to your personal statement"
+          {/* Center: Desktop Navigation Bar */}
+          <nav className="hidden md:flex items-center gap-1 bg-[#F7F5EE] p-1 rounded-xl border border-[#DFD9CA]" aria-label="Main Navigation">
+            {navLinks.map((link) => {
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`text-xs px-3.5 py-1.5 rounded-lg transition-all font-medium flex items-center gap-1.5 ${
+                    isActive
+                      ? 'bg-[#FCFBF7] text-[#292D29] border border-[#DFD9CA] shadow-2xs'
+                      : 'text-[#606860] hover:text-[#292D29] hover:bg-[#EEEBDD]'
+                  }`}
+                  aria-current={isActive ? 'page' : undefined}
                 >
-                  (Return to My Data)
-                </button>
+                  <link.icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#365844]' : 'text-[#8A928A]'}`} />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Right: Context Switcher, Import Action & Diagnostics Button */}
+          <div className="flex items-center gap-2.5">
+            {/* Restrained Context Switcher */}
+            <button
+              onClick={() => handleSwitchContext(isDemo ? 'personal' : 'demo')}
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-[#F7F5EE] hover:bg-[#EEEBDD] border border-[#DFD9CA] text-[#606860] hover:text-[#292D29] flex items-center gap-1.5 transition-all btn-tactile cursor-pointer"
+              title={isDemo ? 'Switching to Personal data partition' : 'Switching to 6-month Demo dataset'}
+            >
+              <span className={`w-2 h-2 rounded-full ${isDemo ? 'bg-[#E8C95D]' : 'bg-[#365844]'}`} />
+              <span className="font-mono text-[11px] font-medium">
+                {isDemo ? 'Demo Mode' : 'Personal Data'}
+              </span>
+            </button>
+
+            {/* Import Statement Action */}
+            <button
+              onClick={() => setIsImportOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-lg bg-[#365844] hover:bg-[#2c4737] text-white font-medium shadow-2xs transition-all btn-tactile cursor-pointer"
+            >
+              <UploadCloud className="w-3.5 h-3.5" />
+              <span>Import Statement</span>
+            </button>
+
+            {/* Diagnostics & Settings trigger */}
+            <div className="relative" ref={diagnosticRef}>
+              <button
+                onClick={() => setIsDiagnosticOpen(!isDiagnosticOpen)}
+                className={`p-2 rounded-lg transition-all cursor-pointer ${
+                  isDiagnosticOpen
+                    ? 'bg-[#EEEBDD] text-[#292D29] border border-[#DFD9CA]'
+                    : 'text-[#8A928A] hover:text-[#292D29] hover:bg-[#F7F5EE]'
+                }`}
+                aria-label="Settings and System Diagnostics"
+                title="Settings & System Diagnostics"
+              >
+                <SlidersHorizontal className="w-4 h-4" />
+              </button>
+
+              {/* Diagnostic Dropdown Popover */}
+              {isDiagnosticOpen && (
+                <div className="absolute right-0 mt-2 w-80 p-4 bg-[#FCFBF7] border border-[#DFD9CA] rounded-2xl shadow-xl z-50 text-xs space-y-4 animate-slide-up">
+                  <div className="flex items-center justify-between border-b border-[#EEEBDD] pb-2">
+                    <span className="font-mono font-medium text-[11px] uppercase tracking-wider text-[#292D29]">
+                      System & Tone
+                    </span>
+                    <button
+                      onClick={() => setIsDiagnosticOpen(false)}
+                      className="text-[#8A928A] hover:text-[#292D29] p-0.5 rounded cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Tone selector */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-[#606860] font-mono">
+                      Observation Tone
+                    </label>
+                    <div className="grid grid-cols-3 gap-1 bg-[#F7F5EE] p-1 rounded-lg border border-[#DFD9CA]">
+                      {(['playful', 'dry', 'minimal'] as const).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => handleToneChange(t)}
+                          className={`py-1 text-center capitalize rounded-md transition-all cursor-pointer ${
+                            currentTone === t
+                              ? 'bg-[#FCFBF7] text-[#365844] font-medium border border-[#DFD9CA] shadow-2xs'
+                              : 'text-[#8A928A] hover:text-[#292D29]'
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Diagnostic status block */}
+                  <div className="p-3 bg-[#F7F5EE] border border-[#DFD9CA] rounded-xl space-y-2">
+                    <div className="text-[10px] uppercase tracking-wider font-mono text-[#8A928A]">
+                      Engine Diagnostics
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-[#606860]">
+                        <Cpu className="w-3.5 h-3.5 text-[#365844]" />
+                        <span>AI Engine:</span>
+                      </span>
+                      <span className="font-mono text-[11px] text-[#292D29]">
+                        {health?.ollama_available ? 'Gemma (Ollama Local)' : 'Deterministic Rules'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1.5 text-[#606860]">
+                        <Database className="w-3.5 h-3.5 text-[#365844]" />
+                        <span>Storage:</span>
+                      </span>
+                      <span className="font-mono text-[11px] text-[#292D29]">
+                        SQLite Local ({health?.transaction_count || 0} rows)
+                      </span>
+                    </div>
+
+                    <div className="text-[10px] text-[#8A928A] pt-1 border-t border-[#DFD9CA]/50 font-sans">
+                      100% local-first. Raw statements and fingerprints never leave this device.
+                    </div>
+                  </div>
+
+                  {/* Reset/Clear Action */}
+                  <div className="pt-1">
+                    <button
+                      onClick={() => {
+                        setIsDiagnosticOpen(false);
+                        handleClearData();
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer text-xs font-medium"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Clear Local Data</span>
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
-          ) : (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#9CAF88]/20 border border-[#9CAF88] text-[#292D29] font-medium">
-              <div className="w-2 h-2 rounded-full bg-[#365844]" />
-              <span className="font-sans">Personal Notebook</span>
-            </div>
-          )}
-        </div>
-
-        {/* Desktop Action Controls */}
-        <div className="hidden md:flex items-center gap-3">
-          {/* Tone Selector */}
-          <div className="flex items-center gap-0.5 bg-[#EEEBDD] border border-[#DFD9CA] rounded-full p-1 text-xs">
-            <span className="text-[10px] text-[#8A928A] font-semibold px-2 uppercase tracking-wider">Tone:</span>
-            {(['playful', 'dry', 'minimal'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => onToneChange?.(t)}
-                className={`px-2.5 py-0.5 rounded-full text-[11px] capitalize font-medium transition-all cursor-pointer ${
-                  health?.current_tone === t
-                    ? 'bg-[#365844] text-[#FCFBF7] shadow-sm font-semibold'
-                    : 'text-[#606860] hover:text-[#292D29]'
-                }`}
-                title={`Tone: ${t}`}
-              >
-                {t}
-              </button>
-            ))}
           </div>
+        </div>
+      </header>
 
-          {/* Demo toggle / Explore */}
-          {health?.is_demo_mode ? (
-            health?.has_personal_data && (
-              <button
-                onClick={() => onSwitchContext?.('personal')}
-                className="px-3 py-1.5 text-xs font-medium text-[#365844] bg-[#FCFBF7] hover:bg-[#EEEBDD] border border-[#DFD9CA] rounded-full transition-colors cursor-pointer"
-              >
-                My Personal Data
-              </button>
-            )
-          ) : (
-            <button
-              onClick={() => onSwitchContext ? onSwitchContext('demo') : onLoadDemo()}
-              disabled={isDemoLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#606860] hover:text-[#292D29] bg-[#FCFBF7] hover:bg-[#EEEBDD] border border-[#DFD9CA] rounded-full transition-colors cursor-pointer"
-              title="Explore realistic 6-month demonstration statements"
+      {/* Mobile Bottom Navigation Bar */}
+      <nav
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#FCFBF7]/95 backdrop-blur-md border-t border-[#DFD9CA] px-4 py-2 flex items-center justify-around shadow-lg"
+        aria-label="Mobile Navigation"
+      >
+        {navLinks.map((link) => {
+          const isActive = pathname === link.href;
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[11px] font-medium transition-all ${
+                isActive
+                  ? 'text-[#365844]'
+                  : 'text-[#8A928A] hover:text-[#292D29]'
+              }`}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isDemoLoading ? 'animate-spin' : ''}`} />
-              <span>Explore Demo</span>
-            </button>
-          )}
+              <link.icon className={`w-5 h-5 ${isActive ? 'text-[#365844]' : 'text-[#8A928A]'}`} />
+              <span>{link.label}</span>
+            </Link>
+          );
+        })}
 
-          {/* Clear data button */}
-          <button
-            onClick={onClearData}
-            className="p-2 text-[#8A928A] hover:text-[#C85A32] hover:bg-[#C85A32]/10 rounded-full transition-colors cursor-pointer"
-            title="Clear data from current context"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-
-          {/* Import CSV CTA */}
-          <button
-            onClick={onOpenImport}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-medium text-[#FCFBF7] bg-[#365844] hover:bg-[#2A4535] rounded-full shadow-sm hover:shadow transition-all cursor-pointer"
-          >
-            <UploadCloud className="w-4 h-4" />
-            <span>Import Statement</span>
-          </button>
-        </div>
-
-        {/* Mobile menu trigger */}
-        <div className="flex md:hidden items-center gap-2">
-          <button
-            onClick={onOpenImport}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#FCFBF7] bg-[#365844] rounded-full"
-          >
-            <UploadCloud className="w-3.5 h-3.5" />
-            <span>Import</span>
-          </button>
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-full border border-[#DFD9CA] bg-[#FCFBF7] text-[#292D29]"
-            aria-label="Toggle menu"
-          >
-            {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-          </button>
-        </div>
-      </div>
-
-      {/* Mobile Drawer */}
-      {mobileMenuOpen && (
-        <div className="md:hidden border-t border-[#DFD9CA] bg-[#FCFBF7] px-6 py-4 space-y-3 text-xs">
-          <div className="flex items-center justify-between pb-2 border-b border-[#DFD9CA]">
-            <span className="text-[#8A928A] uppercase tracking-wider text-[10px]">Context</span>
-            <span className="font-semibold text-[#292D29]">
-              {health?.is_demo_mode ? 'Realistic Demo Data' : 'Personal Data'}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between pb-2 border-b border-[#DFD9CA]">
-            <span className="text-[#8A928A] uppercase tracking-wider text-[10px]">Tone</span>
-            <div className="flex gap-1">
-              {(['playful', 'dry', 'minimal'] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => onToneChange?.(t)}
-                  className={`px-2 py-0.5 rounded-full text-[11px] capitalize ${
-                    health?.current_tone === t ? 'bg-[#365844] text-white font-bold' : 'text-[#606860]'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            {health?.is_demo_mode ? (
-              <button
-                onClick={() => { onSwitchContext?.('personal'); setMobileMenuOpen(false); }}
-                className="text-[#365844] font-semibold underline"
-              >
-                Return to My Data
-              </button>
-            ) : (
-              <button
-                onClick={() => { onSwitchContext?.('demo'); setMobileMenuOpen(false); }}
-                className="text-[#606860] hover:text-[#292D29]"
-              >
-                Explore Demo Data
-              </button>
-            )}
-
-            <button
-              onClick={() => { onClearData(); setMobileMenuOpen(false); }}
-              className="text-[#C85A32] flex items-center gap-1"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Clear Data</span>
-            </button>
-          </div>
-        </div>
-      )}
-    </header>
+        {/* Mobile Quick Import button */}
+        <button
+          onClick={() => setIsImportOpen(true)}
+          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[11px] font-medium text-[#365844] hover:text-[#2c4737]"
+          title="Import Statement"
+        >
+          <UploadCloud className="w-5 h-5" />
+          <span>Import</span>
+        </button>
+      </nav>
+    </>
   );
 };
