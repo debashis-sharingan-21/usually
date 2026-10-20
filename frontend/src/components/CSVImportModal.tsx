@@ -347,12 +347,15 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
       />
 
       <div
-        className={`bg-[#FCFBF7] border rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden transition-all ${
+        className={`bg-[#FCFBF7] border rounded-2xl w-full max-w-4xl h-full max-h-[calc(100vh-2rem)] sm:max-h-[88vh] flex flex-col shadow-2xl overflow-hidden transition-all ${
           isDragging ? 'border-[#365844] ring-2 ring-[#365844]/30' : 'border-[#DFD9CA]'
         }`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="import-modal-title"
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-[#DFD9CA] flex items-center justify-between bg-[#F7F5EE]">
+        <div className="shrink-0 px-5 sm:px-6 py-3.5 sm:py-4 border-b border-[#DFD9CA] flex items-center justify-between bg-[#F7F5EE]">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA]">
               <UploadCloud className="w-5 h-5" />
@@ -383,7 +386,7 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
         </div>
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto space-y-5 flex-1 text-sm bg-[#FCFBF7]">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 min-h-0 text-sm bg-[#FCFBF7]">
           {/* STATE 1: SUCCESS RESULT */}
           {currentStatus === 'success' && importResult && selection && (
             <div className="space-y-5 py-4 text-center animate-fade-in">
@@ -471,15 +474,6 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                     )}
                   </div>
                 )}
-              </div>
-
-              <div className="pt-3">
-                <button
-                  onClick={handleClose}
-                  className="px-6 py-2.5 rounded-xl bg-[#365844] hover:bg-[#2c4737] text-white font-medium text-xs shadow-sm transition-all btn-tactile cursor-pointer"
-                >
-                  Done & View Insights
-                </button>
               </div>
             </div>
           )}
@@ -834,45 +828,64 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
           )}
         </div>
 
-        {/* Footer */}
-        {currentStatus !== 'success' && (
-          <div className="px-6 py-4 border-t border-[#DFD9CA] bg-[#F7F5EE] flex items-center justify-between">
-            <div className="text-xs text-[#606860] font-mono">
-              {currentStatus === 'previewing' && selection
-                ? `Analyzing ${selection.fileName} (${selection.formattedSize})...`
-                : currentStatus === 'preview_ready' && selection?.preview
-                ? `${selection.preview.valid_count} valid records ready to commit from ${selection.fileName}`
-                : currentStatus === 'preview_error'
-                ? 'Preview failed • Ready to retry or select another file'
-                : 'Awaiting statement file'}
-            </div>
-            <div className="flex items-center gap-3">
+        {/* Persistent Action Footer */}
+        <div className="shrink-0 px-5 sm:px-6 py-3.5 sm:py-4 border-t border-[#DFD9CA] bg-[#F7F5EE] flex flex-col sm:flex-row items-center justify-between gap-3">
+          {currentStatus === 'success' ? (
+            <>
+              <div className="text-xs text-[#365844] font-mono flex items-center gap-2 self-start sm:self-auto">
+                <CheckCircle2 className="w-4 h-4 text-[#365844] shrink-0" />
+                <span>
+                  {importResult?.accepted_rows ?? 0} transactions accepted • Ledger updated
+                </span>
+              </div>
               <button
                 onClick={handleClose}
-                className="px-4 py-2 rounded-lg text-xs font-medium text-[#606860] hover:text-[#292D29] cursor-pointer"
+                autoFocus
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-[#365844] hover:bg-[#2c4737] text-white font-medium text-xs shadow-sm transition-all btn-tactile cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-[#365844]/40"
               >
-                Cancel
+                <span>Done & View Insights</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
-              <button
-                onClick={handleCommit}
-                disabled={currentStatus !== 'preview_ready' || !selection?.preview || selection.preview.valid_count === 0}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-[#365844] hover:bg-[#2c4737] disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-xs shadow-sm transition-all btn-tactile cursor-pointer"
-              >
-                {currentStatus === 'importing' ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Importing...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Confirm & Import {selection?.preview ? `(${selection.preview.valid_count} rows)` : ''}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
+            </>
+          ) : (
+            <>
+              <div className="text-xs text-[#606860] font-mono truncate max-w-md self-start sm:self-auto">
+                {currentStatus === 'previewing' && selection
+                  ? `Analyzing ${selection.fileName} (${selection.formattedSize})...`
+                  : currentStatus === 'preview_ready' && selection?.preview
+                  ? `${selection.preview.valid_count} valid records ready to commit from ${selection.fileName}`
+                  : currentStatus === 'preview_error'
+                  ? 'Preview failed • Ready to retry or select another file'
+                  : 'Awaiting statement file'}
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
+                <button
+                  onClick={handleClose}
+                  className="px-4 py-2 rounded-lg text-xs font-medium text-[#606860] hover:text-[#292D29] hover:bg-[#EEEBDD] transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCommit}
+                  disabled={currentStatus !== 'preview_ready' || !selection?.preview || selection.preview.valid_count === 0}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2 rounded-xl bg-[#365844] hover:bg-[#2c4737] disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-xs shadow-sm transition-all btn-tactile cursor-pointer focus:outline-hidden focus:ring-2 focus:ring-[#365844]/40"
+                >
+                  {currentStatus === 'importing' ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Importing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Confirm & Import {selection?.preview ? `(${selection.preview.valid_count} rows)` : ''}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
