@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     clean_merchant TEXT NOT NULL,
     category TEXT NOT NULL,
     amount REAL NOT NULL,
-    type TEXT NOT NULL,
+    direction TEXT NOT NULL DEFAULT 'debit', -- 'debit', 'credit', 'unknown'
+    type TEXT NOT NULL, -- 'expense', 'p2p', 'transfer', 'income', 'refund'
     currency TEXT NOT NULL DEFAULT 'INR',
     fingerprint TEXT UNIQUE NOT NULL,
     is_user_modified INTEGER NOT NULL DEFAULT 0,
@@ -138,6 +139,42 @@ def get_connection(context: Optional[str] = None) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
+def migrate_db(conn: sqlite3.Connection):
+    """
+    Non-destructive schema migration.
+    Ensures 'direction' column exists in transactions and populates it
+    from verified source statement patterns without erasing classification.
+    """
+    cur = conn.cursor()
+    cur.execute("PRAGMA table_info(transactions)")
+    cols = [col[1] for col in cur.fetchall()]
+    if not cols:
+        return
+    if "direction" not in cols:
+        cur.execute("ALTER TABLE transactions ADD COLUMN direction TEXT NOT NULL DEFAULT 'debit'")
+        
+        # Safe direction population based on existing evidence:
+        # Credits:
+        cur.execute("""
+            UPDATE transactions
+            SET direction = 'credit'
+            WHERE type IN ('income', 'refund')
+               OR lower(raw_description) LIKE 'received from%'
+               OR lower(raw_description) LIKE '%refund%'
+        """)
+        # Debits:
+        cur.execute("""
+            UPDATE transactions
+            SET direction = 'debit'
+            WHERE (type IN ('expense', 'transfer')
+               OR lower(raw_description) LIKE 'paid to%'
+               OR lower(raw_description) LIKE 'paid -%')
+              AND direction != 'credit'
+        """)
+        conn.commit()
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_tx_direction ON transactions(direction)")
+    conn.commit()
+
 def init_db(context: Optional[str] = None):
     contexts = [context] if context else ["personal", "demo"]
     for ctx in contexts:
@@ -145,4 +182,5 @@ def init_db(context: Optional[str] = None):
         conn = sqlite3.connect(path)
         with conn:
             conn.executescript(SCHEMA_SQL)
+        migrate_db(conn)
         conn.close()

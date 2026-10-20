@@ -27,6 +27,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
   const [limit] = useState(20);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [directionFilter, setDirectionFilter] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editMerchant, setEditMerchant] = useState('');
   const [editCategory, setEditCategory] = useState('');
@@ -37,6 +38,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
         limit,
         offset: page * limit,
         category: categoryFilter || undefined,
+        direction: directionFilter || undefined,
         search: search || undefined,
       });
       setTransactions(res.items);
@@ -48,7 +50,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
 
   useEffect(() => {
     loadData();
-  }, [page, categoryFilter, search]);
+  }, [page, categoryFilter, directionFilter, search]);
 
   const startEdit = (t: Transaction) => {
     setEditingId(t.id);
@@ -102,6 +104,17 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
             />
           </div>
 
+          {/* Direction Filter */}
+          <select
+            value={directionFilter}
+            onChange={(e) => { setDirectionFilter(e.target.value); setPage(0); }}
+            className="py-1.5 px-3 bg-[#161a26] border border-[#242938] rounded-lg text-xs text-white focus:outline-none focus:border-lime-400"
+          >
+            <option value="">All Flows</option>
+            <option value="debit">Debits (Outflow)</option>
+            <option value="credit">Credits (Inflow)</option>
+          </select>
+
           {/* Category Filter */}
           <select
             value={categoryFilter}
@@ -123,6 +136,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
             <thead className="bg-[#1a1e2b] text-[#8e96ac] uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="py-2.5 px-4">Date</th>
+                <th className="py-2.5 px-4">Flow</th>
                 <th className="py-2.5 px-4">Merchant / Payee</th>
                 <th className="py-2.5 px-4">Category</th>
                 <th className="py-2.5 px-4 text-right">Amount</th>
@@ -134,7 +148,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
             <tbody className="divide-y divide-[#242938]">
               {transactions.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-[#8e96ac]">
+                  <td colSpan={8} className="py-8 text-center text-[#8e96ac]">
                     No transactions match the selected filter.
                   </td>
                 </tr>
@@ -146,6 +160,16 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
                     <tr key={t.id} className="hover:bg-[#1f2536]/40 transition-colors">
                       <td className="py-2.5 px-4 font-mono text-zinc-300 whitespace-nowrap">
                         {t.date}
+                      </td>
+
+                      <td className="py-2.5 px-4 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                          t.direction === 'credit'
+                            ? 'bg-lime-400/15 text-lime-400 border border-lime-400/30'
+                            : 'bg-rose-500/10 text-rose-300 border border-rose-500/20'
+                        }`}>
+                          {t.direction}
+                        </span>
                       </td>
 
                       <td className="py-2.5 px-4 font-medium text-white max-w-xs">
@@ -194,11 +218,9 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
 
                       <td className="py-2.5 px-4 text-right font-mono font-semibold whitespace-nowrap">
                         <span className={
-                          t.type === 'expense' ? 'text-white' :
-                          t.type === 'income' ? 'text-lime-400' :
-                          t.type === 'refund' ? 'text-cyan-400' : 'text-[#8e96ac]'
+                          t.direction === 'credit' ? 'text-lime-400' : 'text-slate-100'
                         }>
-                          {t.type === 'refund' ? '+' : ''}₹{t.amount.toFixed(2)}
+                          {t.direction === 'credit' ? '+' : '-'}₹{t.amount.toFixed(2)}
                         </span>
                       </td>
 

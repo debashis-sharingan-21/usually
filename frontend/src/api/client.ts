@@ -125,6 +125,7 @@ export async function fetchTransactions(params: {
   offset?: number;
   category?: string;
   merchant?: string;
+  direction?: string;
   tx_type?: string;
   search?: string;
 }): Promise<{ total: number; items: Transaction[]; limit: number; offset: number }> {
@@ -133,6 +134,7 @@ export async function fetchTransactions(params: {
   if (params.offset) query.set('offset', String(params.offset));
   if (params.category) query.set('category', params.category);
   if (params.merchant) query.set('merchant', params.merchant);
+  if (params.direction) query.set('direction', params.direction);
   if (params.tx_type) query.set('tx_type', params.tx_type);
   if (params.search) query.set('search', params.search);
 

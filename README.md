@@ -62,9 +62,14 @@ usually/
 │   │   ├── test_persistent_learning.py
 │   │   ├── test_phonepe_export.py
 │   │   ├── test_database_isolation.py
-│   │   └── test_successive_imports.py
+│   │   ├── test_successive_imports.py
+│   │   └── test_transaction_direction.py
 │   └── requirements.txt
 ├── frontend/
+│   ├── app/
+│   │   ├── layout.tsx             # Next.js App Router root layout + Lenis scroll
+│   │   ├── page.tsx               # Main Usually dashboard
+│   │   └── globals.css            # Dark editorial theme with subtle noise overlay
 │   ├── src/
 │   │   ├── api/client.ts          # Typed API client
 │   │   ├── components/
@@ -74,10 +79,14 @@ usually/
 │   │   │   ├── HabitMemoryView.tsx  # Longitudinal habit memory view
 │   │   │   ├── PayeeQuestionsBanner.tsx # One-tap payee clarification cards
 │   │   │   ├── SpendingSummary.tsx  # Spending pace, merchants, categories
-│   │   │   └── TransactionList.tsx  # Searchable & editable transactions
-│   │   ├── types/index.ts         # TypeScript definitions
-│   │   ├── App.tsx                # App shell & onboarding state
-│   │   └── index.css              # Dark-mode styling with lime accents
+│   │   │   ├── TransactionList.tsx  # Searchable & editable transactions with direction badges
+│   │   │   └── LenisProvider.tsx  # Smooth kinetic scrolling provider
+│   │   ├── lib/
+│   │   │   ├── lenis.ts           # Lenis smooth scroll engine
+│   │   │   ├── gsap.ts            # GSAP kinetic animation setup
+│   │   │   └── utils.ts           # UI and currency formatting utilities
+│   │   └── types/index.ts         # TypeScript definitions
+│   ├── next.config.ts             # Next.js API proxy and config
 │   └── package.json
 ├── scripts/
 │   ├── start-backend.ps1

@@ -5,6 +5,7 @@ import hashlib
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from app.services.learning_engine import generate_payee_questions_for_batch
+from app.database import migrate_db
 
 DATE_PATTERNS = [
     ("%Y-%m-%d", r"^\d{4}-\d{2}-\d{2}$"),
@@ -353,9 +354,17 @@ def extract_rows_and_headers(csv_content: str) -> Tuple[List[str], List[List[str
 
     return headers, data_rows, metadata, blank_rows_skipped
 
-def generate_fingerprint(date_str: str, clean_merchant: str, amount: float, tx_type: str, ref_id: Optional[str], occurrence_counter: int) -> str:
+def generate_fingerprint(
+    date_str: str,
+    clean_merchant: str,
+    amount: float,
+    tx_type: str,
+    ref_id: Optional[str],
+    occurrence_counter: int,
+    direction: str = "debit"
+) -> str:
     ref_part = f"ref:{ref_id.strip()}" if ref_id and ref_id.strip() else f"occ:{occurrence_counter}"
-    raw_key = f"{date_str}|{clean_merchant.strip().lower()}|{amount:.2f}|{tx_type.lower()}|{ref_part}"
+    raw_key = f"{date_str}|{clean_merchant.strip().lower()}|{amount:.2f}|{direction.lower()}|{tx_type.lower()}|{ref_part}"
     return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
 
 def parse_and_preview_csv(
@@ -441,20 +450,9 @@ def parse_and_preview_csv(
         parsed_category = cat
         parsed_type = t_type
 
-        if status == "valid":
-            direction_type = None
-            if type_col and type_col in header_indices and header_indices[type_col] < len(row):
-                raw_type = row[header_indices[type_col]].strip().lower()
-                if "debit" in raw_type or "dr" == raw_type:
-                    direction_type = "expense"
-                elif "credit" in raw_type or "cr" == raw_type:
-                    if "refund" in raw_desc.lower() or "cashback" in raw_desc.lower():
-                        direction_type = "refund"
-                    elif t_type == "p2p" or "received from" in raw_desc.lower():
-                        direction_type = "p2p"
-                    else:
-                        direction_type = "income"
+        parsed_direction = "debit"
 
+        if status == "valid":
             if debit_col and credit_col and debit_col in header_indices and credit_col in header_indices:
                 raw_deb = row[header_indices[debit_col]] if header_indices[debit_col] < len(row) else ""
                 raw_cred = row[header_indices[credit_col]] if header_indices[credit_col] < len(row) else ""
@@ -468,13 +466,14 @@ def parse_and_preview_csv(
                     status = "ambiguous"
                     error_msg = f"Both Debit ({raw_deb}) and Credit ({raw_cred}) populated"
                     parsed_amount = p_deb[0]
+                    parsed_direction = "debit"
                     parsed_type = "expense"
                 elif has_deb:
                     parsed_amount = p_deb[0]
-                    parsed_type = "expense"
+                    parsed_direction = "debit"
                 elif has_cred:
                     parsed_amount = p_cred[0]
-                    parsed_type = "refund" if ("refund" in raw_desc.lower() or "cashback" in raw_desc.lower()) else "income"
+                    parsed_direction = "credit"
                 else:
                     status = "error"
                     error_msg = "Incomplete record: zero or missing amount"
@@ -487,23 +486,55 @@ def parse_and_preview_csv(
                 else:
                     abs_amt, is_neg = amt_res
                     parsed_amount = abs_amt
-                    if direction_type:
-                        parsed_type = direction_type
+
+                    if type_col and type_col in header_indices and header_indices[type_col] < len(row):
+                        raw_type = row[header_indices[type_col]].strip().lower()
+                        if "debit" in raw_type or "dr" == raw_type:
+                            parsed_direction = "debit"
+                        elif "credit" in raw_type or "cr" == raw_type:
+                            parsed_direction = "credit"
+                        elif is_neg:
+                            parsed_direction = "debit"
+                        elif "received from" in raw_desc.lower():
+                            parsed_direction = "credit"
+                        else:
+                            parsed_direction = "debit"
                     elif is_neg:
-                        parsed_type = "expense"
+                        parsed_direction = "debit"
+                    elif "received from" in raw_desc.lower():
+                        parsed_direction = "credit"
                     else:
-                        parsed_type = t_type
+                        parsed_direction = "debit"
             else:
                 status = "error"
                 error_msg = "No amount column configured"
+
+            # Determine classification (type) preserved alongside direction
+            if status == "valid":
+                if parsed_direction == "debit":
+                    if t_type == "transfer" or cat == "Transfers":
+                        parsed_type = "transfer"
+                    elif t_type == "p2p":
+                        parsed_type = "p2p"
+                    else:
+                        parsed_type = "expense"
+                else:  # credit
+                    if "refund" in raw_desc.lower() or "cashback" in raw_desc.lower() or t_type == "refund":
+                        parsed_type = "refund"
+                    elif t_type == "p2p" or "received from" in raw_desc.lower():
+                        parsed_type = "p2p"
+                    elif "salary" in raw_desc.lower() or "payroll" in raw_desc.lower() or t_type == "income":
+                        parsed_type = "income"
+                    else:
+                        parsed_type = "income"
 
         if status == "valid":
             valid_count += 1
             if parsed_date:
                 detected_dates.append(parsed_date)
-            if parsed_type == "expense" and parsed_amount:
+            if parsed_direction == "debit" and parsed_type == "expense" and parsed_amount:
                 sample_total_expenses += parsed_amount
-            elif parsed_type == "refund" and parsed_amount:
+            elif parsed_direction == "credit" and parsed_type == "refund" and parsed_amount:
                 sample_total_expenses -= parsed_amount
         elif status == "ambiguous":
             ambiguous_count += 1
@@ -518,6 +549,7 @@ def parse_and_preview_csv(
                 "parsed_merchant": parsed_merchant,
                 "parsed_category": parsed_category,
                 "parsed_amount": parsed_amount,
+                "parsed_direction": parsed_direction,
                 "parsed_type": parsed_type,
                 "status": status,
                 "error_message": error_msg,
@@ -563,6 +595,7 @@ def execute_import(
     mapping: Dict[str, str],
     currency: str = "INR"
 ) -> Dict[str, Any]:
+    migrate_db(conn)
     headers, all_raw_rows, metadata, blank_rows_skipped = extract_rows_and_headers(csv_content)
 
     header_indices = {h: idx for idx, h in enumerate(headers)}
@@ -583,6 +616,7 @@ def execute_import(
     gross_credit_inflow = 0.0
     classified_expenses = 0.0
     transfers_outflow = 0.0
+    p2p_outgoing = 0.0
     p2p_incoming = 0.0
     refunds_inflow = 0.0
 
@@ -637,21 +671,8 @@ def execute_import(
 
         clean_m, category, default_type = clean_merchant_and_category(raw_desc, learned_rules=learned_rules)
 
-        direction_type = None
-        if type_col and type_col in header_indices and header_indices[type_col] < len(row):
-            raw_t = row[header_indices[type_col]].strip().lower()
-            if "debit" in raw_t or "dr" == raw_t:
-                direction_type = "expense"
-            elif "credit" in raw_t or "cr" == raw_t:
-                if "refund" in raw_desc.lower() or "cashback" in raw_desc.lower():
-                    direction_type = "refund"
-                elif default_type == "p2p" or "received from" in raw_desc.lower():
-                    direction_type = "p2p"
-                else:
-                    direction_type = "income"
-
         parsed_amount = None
-        parsed_type = direction_type or default_type
+        parsed_direction = "debit"
 
         if debit_col and credit_col and debit_col in header_indices and credit_col in header_indices:
             raw_deb = row[header_indices[debit_col]] if header_indices[debit_col] < len(row) else ""
@@ -664,10 +685,10 @@ def execute_import(
 
             if has_deb and not has_cred:
                 parsed_amount = p_deb[0]
-                parsed_type = "expense"
+                parsed_direction = "debit"
             elif has_cred and not has_deb:
                 parsed_amount = p_cred[0]
-                parsed_type = "refund" if ("refund" in raw_desc.lower() or "cashback" in raw_desc.lower()) else "income"
+                parsed_direction = "credit"
             elif has_deb and has_cred:
                 rejected_rows += 1
                 errors.append({"row": row_num, "error": f"Ambiguous row: both Debit ({raw_deb}) and Credit ({raw_cred}) populated"})
@@ -685,16 +706,47 @@ def execute_import(
                 continue
             abs_amt, is_neg = p_amt
             parsed_amount = abs_amt
-            if direction_type:
-                parsed_type = direction_type
+
+            if type_col and type_col in header_indices and header_indices[type_col] < len(row):
+                raw_t = row[header_indices[type_col]].strip().lower()
+                if "debit" in raw_t or "dr" == raw_t:
+                    parsed_direction = "debit"
+                elif "credit" in raw_t or "cr" == raw_t:
+                    parsed_direction = "credit"
+                elif is_neg:
+                    parsed_direction = "debit"
+                elif "received from" in raw_desc.lower():
+                    parsed_direction = "credit"
+                else:
+                    parsed_direction = "debit"
             elif is_neg:
-                parsed_type = "expense"
+                parsed_direction = "debit"
+            elif "received from" in raw_desc.lower():
+                parsed_direction = "credit"
             else:
-                parsed_type = default_type
+                parsed_direction = "debit"
         else:
             rejected_rows += 1
             errors.append({"row": row_num, "error": "No amount column configured"})
             continue
+
+        # Preserve separate classification (type)
+        if parsed_direction == "debit":
+            if default_type == "transfer" or category == "Transfers":
+                parsed_type = "transfer"
+            elif default_type == "p2p":
+                parsed_type = "p2p"
+            else:
+                parsed_type = "expense"
+        else:  # credit
+            if "refund" in raw_desc.lower() or "cashback" in raw_desc.lower() or default_type == "refund":
+                parsed_type = "refund"
+            elif default_type == "p2p" or "received from" in raw_desc.lower():
+                parsed_type = "p2p"
+            elif "salary" in raw_desc.lower() or "payroll" in raw_desc.lower() or default_type == "income":
+                parsed_type = "income"
+            else:
+                parsed_type = "income"
 
         ref_id = None
         if ref_col and ref_col in header_indices and header_indices[ref_col] < len(row):
@@ -702,11 +754,11 @@ def execute_import(
             if ref_val:
                 ref_id = ref_val
 
-        key = (parsed_date, clean_m.lower(), parsed_amount, parsed_type)
+        key = (parsed_date, clean_m.lower(), parsed_amount, parsed_direction, parsed_type)
         batch_occurrence[key] = batch_occurrence.get(key, 0) + 1
         occ = batch_occurrence[key]
 
-        fp = generate_fingerprint(parsed_date, clean_m, parsed_amount, parsed_type, ref_id, occ)
+        fp = generate_fingerprint(parsed_date, clean_m, parsed_amount, parsed_type, ref_id, occ, direction=parsed_direction)
 
         if fp in existing_fps:
             duplicate_rows += 1
@@ -716,20 +768,20 @@ def execute_import(
         accepted_rows += 1
         detected_dates.append(parsed_date)
 
-        if parsed_type == "expense":
+        if parsed_direction == "debit":
             gross_debit_outflow += parsed_amount
-            classified_expenses += parsed_amount
-        elif parsed_type == "transfer":
-            gross_debit_outflow += parsed_amount
-            transfers_outflow += parsed_amount
-        elif parsed_type == "refund":
+            if parsed_type == "expense" and category != "Transfers":
+                classified_expenses += parsed_amount
+            elif parsed_type == "transfer" or category == "Transfers":
+                transfers_outflow += parsed_amount
+            elif parsed_type == "p2p":
+                p2p_outgoing = p2p_outgoing + parsed_amount if 'p2p_outgoing' in locals() else parsed_amount
+        else:  # credit
             gross_credit_inflow += parsed_amount
-            refunds_inflow += parsed_amount
-        elif parsed_type == "p2p":
-            gross_credit_inflow += parsed_amount
-            p2p_incoming += parsed_amount
-        elif parsed_type == "income":
-            gross_credit_inflow += parsed_amount
+            if parsed_type == "refund":
+                refunds_inflow += parsed_amount
+            elif parsed_type == "p2p":
+                p2p_incoming += parsed_amount
 
         transactions_to_insert.append((
             batch_id,
@@ -738,6 +790,7 @@ def execute_import(
             clean_m,
             category,
             parsed_amount,
+            parsed_direction,
             parsed_type,
             currency,
             fp,
@@ -755,8 +808,8 @@ def execute_import(
             conn.executemany("""
                 INSERT INTO transactions (
                     import_batch_id, date, raw_description, clean_merchant, category,
-                    amount, type, currency, fingerprint, is_user_modified, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    amount, direction, type, currency, fingerprint, is_user_modified, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, transactions_to_insert)
 
     try:
@@ -787,6 +840,7 @@ def execute_import(
         "gross_credit_inflow": round(gross_credit_inflow, 2),
         "classified_expenses": round(classified_expenses, 2),
         "transfers_outflow": round(transfers_outflow, 2),
+        "p2p_outgoing": round(p2p_outgoing, 2),
         "p2p_incoming": round(p2p_incoming, 2),
         "refunds_inflow": round(refunds_inflow, 2),
         "net_spending": net_spending,

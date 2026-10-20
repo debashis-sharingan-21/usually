@@ -1,35 +1,43 @@
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 import sqlite3
+from app.database import migrate_db
 
 def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     """
-    Computes deterministic totals, merchant totals, category totals,
-    and current month spending pace. Transfers are excluded from consumer expenses.
+    Computes deterministic accounting summary combining direction and classification:
+    - Consumer expenses: debit purchases (excluding self-transfers)
+    - P2P Outgoing: money sent to people (outflow)
+    - P2P Incoming: money received from people (inflow)
+    - Transfers: CC payments and self-transfers (outflow)
+    - Gross debit outflow: all money paid out
+    - Gross credit inflow: all money received
+    - Net cash flow: total income + p2p incoming + refunds - consumer expenses
     """
+    migrate_db(conn)
     cur = conn.cursor()
 
-    # Total expenses (excluding transfers)
+    # Total expenses (consumer debits excluding transfers)
     cur.execute("""
         SELECT COALESCE(SUM(amount), 0.0)
         FROM transactions
-        WHERE type = 'expense' AND category != 'Transfers'
+        WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
     """)
     total_expenses = float(cur.fetchone()[0])
 
-    # Total income
+    # Total income (verified incoming earnings)
     cur.execute("""
         SELECT COALESCE(SUM(amount), 0.0)
         FROM transactions
-        WHERE type = 'income'
+        WHERE direction = 'credit' AND type = 'income'
     """)
     total_income = float(cur.fetchone()[0])
 
-    # Total refunds
+    # Total refunds (verified merchant credits returned)
     cur.execute("""
         SELECT COALESCE(SUM(amount), 0.0)
         FROM transactions
-        WHERE type = 'refund'
+        WHERE direction = 'credit' AND type = 'refund'
     """)
     total_refunds = float(cur.fetchone()[0])
 
@@ -37,20 +45,44 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     cur.execute("""
         SELECT COALESCE(SUM(amount), 0.0)
         FROM transactions
-        WHERE type = 'transfer' OR category = 'Transfers'
+        WHERE direction = 'debit' AND (type = 'transfer' OR category = 'Transfers')
     """)
     total_transfers = float(cur.fetchone()[0])
 
-    # Total P2P incoming credits (money received from people)
+    # Total P2P outgoing debits (money sent to people - OUTFLOW, never counted as income)
     cur.execute("""
         SELECT COALESCE(SUM(amount), 0.0)
         FROM transactions
-        WHERE type = 'p2p'
+        WHERE direction = 'debit' AND type = 'p2p'
+    """)
+    total_p2p_outgoing = float(cur.fetchone()[0])
+
+    # Total P2P incoming credits (money received from people - INFLOW)
+    cur.execute("""
+        SELECT COALESCE(SUM(amount), 0.0)
+        FROM transactions
+        WHERE direction = 'credit' AND type = 'p2p'
     """)
     total_p2p_incoming = float(cur.fetchone()[0])
 
-    gross_debit_outflow = total_expenses + total_transfers
-    gross_credit_inflow = total_income + total_refunds + total_p2p_incoming
+    # Gross Debit Outflow (all money leaving the account)
+    cur.execute("""
+        SELECT COALESCE(SUM(amount), 0.0)
+        FROM transactions
+        WHERE direction = 'debit'
+    """)
+    gross_debit_outflow = float(cur.fetchone()[0])
+
+    # Gross Credit Inflow (all money entering the account)
+    cur.execute("""
+        SELECT COALESCE(SUM(amount), 0.0)
+        FROM transactions
+        WHERE direction = 'credit'
+    """)
+    gross_credit_inflow = float(cur.fetchone()[0])
+
+    # Net cash flow is net earnings after consumer expenses & refunds (excluding non-consumer transfers)
+    net_cash_flow = round(total_income + total_p2p_incoming + total_refunds - total_expenses, 2)
 
     # Total transaction count
     cur.execute("SELECT COUNT(*) FROM transactions")
@@ -62,12 +94,12 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     min_date = row[0] if row and row[0] else None
     max_date = row[1] if row and row[1] else None
 
-    # Top Merchants (expenses only)
+    # Top Merchants (consumer debit expenses only)
     cur.execute("""
         SELECT clean_merchant, category, SUM(amount) as total_amt, COUNT(*) as txn_count,
                MIN(date) as first_seen, MAX(date) as last_seen
         FROM transactions
-        WHERE type = 'expense' AND category != 'Transfers'
+        WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
         GROUP BY clean_merchant
         ORDER BY total_amt DESC
         LIMIT 10
@@ -84,16 +116,15 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
             "last_seen": r[5]
         })
 
-    # Category Breakdown
+    # Category Breakdown (consumer debit expenses only)
     cur.execute("""
         SELECT category, SUM(amount) as total_amt, COUNT(*) as txn_count
         FROM transactions
-        WHERE type = 'expense' AND category != 'Transfers'
+        WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
         GROUP BY category
         ORDER BY total_amt DESC
     """)
     category_breakdown = []
-    effective_expense = total_expenses - total_refunds
     for r in cur.fetchall():
         amt = round(r[1], 2)
         pct = round((amt / total_expenses * 100), 1) if total_expenses > 0 else 0.0
@@ -108,7 +139,7 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     cur.execute("""
         SELECT strftime('%Y-%m', date) as month, SUM(amount) as monthly_expense
         FROM transactions
-        WHERE type = 'expense' AND category != 'Transfers'
+        WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
         GROUP BY month
         ORDER BY month ASC
     """)
@@ -125,7 +156,7 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         cur.execute("""
             SELECT COALESCE(SUM(amount), 0.0)
             FROM transactions
-            WHERE type = 'expense' AND category != 'Transfers'
+            WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
               AND strftime('%Y-%m', date) = ?
               AND CAST(strftime('%d', date) AS INTEGER) <= ?
         """, (latest_month, latest_day))
@@ -135,7 +166,7 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         cur.execute("""
             SELECT strftime('%Y-%m', date) as m, COALESCE(SUM(amount), 0.0)
             FROM transactions
-            WHERE type = 'expense' AND category != 'Transfers'
+            WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
               AND strftime('%Y-%m', date) < ?
               AND CAST(strftime('%d', date) AS INTEGER) <= ?
             GROUP BY m
@@ -163,10 +194,11 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         "total_income": round(total_income, 2),
         "total_refunds": round(total_refunds, 2),
         "total_transfers": round(total_transfers, 2),
+        "total_p2p_outgoing": round(total_p2p_outgoing, 2),
         "total_p2p_incoming": round(total_p2p_incoming, 2),
         "gross_debit_outflow": round(gross_debit_outflow, 2),
         "gross_credit_inflow": round(gross_credit_inflow, 2),
-        "net_cash_flow": round(total_income + total_p2p_incoming + total_refunds - total_expenses, 2),
+        "net_cash_flow": net_cash_flow,
         "transaction_count": tx_count,
         "date_range": {"min": min_date, "max": max_date} if min_date else None,
         "top_merchants": top_merchants,

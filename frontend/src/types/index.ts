@@ -6,6 +6,7 @@ export interface Transaction {
   clean_merchant: string;
   category: string;
   amount: number;
+  direction: 'debit' | 'credit' | 'unknown';
   type: 'expense' | 'income' | 'refund' | 'transfer' | 'p2p';
   currency: string;
   fingerprint: string;
@@ -20,6 +21,7 @@ export interface CSVPreviewRow {
   parsed_merchant?: string;
   parsed_category?: string;
   parsed_amount?: number;
+  parsed_direction?: 'debit' | 'credit' | 'unknown';
   parsed_type?: string;
   status: 'valid' | 'error' | 'ambiguous';
   error_message?: string;
@@ -58,6 +60,7 @@ export interface CSVImportResult {
   gross_credit_inflow: number;
   classified_expenses: number;
   transfers_outflow: number;
+  p2p_outgoing: number;
   p2p_incoming: number;
   refunds_inflow: number;
   net_spending: number;
@@ -88,6 +91,7 @@ export interface SpendingSummaryResponse {
   total_income: number;
   total_refunds: number;
   total_transfers: number;
+  total_p2p_outgoing?: number;
   total_p2p_incoming?: number;
   gross_debit_outflow?: number;
   gross_credit_inflow?: number;

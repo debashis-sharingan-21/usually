@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from app.services.csv_importer import generate_fingerprint
+from app.database import migrate_db
 
 def load_realistic_demo_dataset(conn) -> int:
     """
@@ -11,6 +12,7 @@ def load_realistic_demo_dataset(conn) -> int:
     - Monthly salary deposits & CRED card bill transfers
     - Occasional refund
     """
+    migrate_db(conn)
     cur = conn.cursor()
     # Clear existing demo data or transactions if explicitly requested
     cur.execute("DELETE FROM transactions")
@@ -28,10 +30,10 @@ def load_realistic_demo_dataset(conn) -> int:
     transactions = []
     occ_map = {}
 
-    def add_tx(tx_date: str, desc: str, clean_m: str, cat: str, amt: float, tx_type: str, ref: str = None):
-        key = (tx_date, clean_m.lower(), amt, tx_type)
+    def add_tx(tx_date: str, desc: str, clean_m: str, cat: str, amt: float, tx_type: str, direction: str = "debit", ref: str = None):
+        key = (tx_date, clean_m.lower(), amt, direction, tx_type)
         occ_map[key] = occ_map.get(key, 0) + 1
-        fp = generate_fingerprint(tx_date, clean_m, amt, tx_type, ref, occ_map[key])
+        fp = generate_fingerprint(tx_date, clean_m, amt, tx_type, ref, occ_map[key], direction=direction)
         transactions.append((
             batch_id,
             tx_date,
@@ -39,6 +41,7 @@ def load_realistic_demo_dataset(conn) -> int:
             clean_m,
             cat,
             amt,
+            direction,
             tx_type,
             "INR",
             fp,
@@ -66,10 +69,10 @@ def load_realistic_demo_dataset(conn) -> int:
     # 3. Monthly Salary & Transfers (transfers shouldn't count as expenses)
     months = ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]
     for m in months:
-        add_tx(f"{m}-01", "SALARY CREDIT TECH CORP", "Salary", "Income", 95000.00, "income", ref=f"SAL-{m}")
-        add_tx(f"{m}-05", "CRED AUTODEBIT CC PAYMENT", "CRED Payment", "Transfers", 18500.00, "transfer", ref=f"CC-{m}")
-        add_tx(f"{m}-10", "AIRTEL BROADBAND FIBER", "Airtel", "Utilities", 1179.00, "expense")
-        add_tx(f"{m}-15", "NETFLIX ENTERTAINMENT SUBSCRIPTION", "Netflix", "Entertainment", 649.00, "expense")
+        add_tx(f"{m}-01", "SALARY CREDIT TECH CORP", "Salary", "Income", 95000.00, "income", direction="credit", ref=f"SAL-{m}")
+        add_tx(f"{m}-05", "CRED AUTODEBIT CC PAYMENT", "CRED Payment", "Transfers", 18500.00, "transfer", direction="debit", ref=f"CC-{m}")
+        add_tx(f"{m}-10", "AIRTEL BROADBAND FIBER", "Airtel", "Utilities", 1179.00, "expense", direction="debit")
+        add_tx(f"{m}-15", "NETFLIX ENTERTAINMENT SUBSCRIPTION", "Netflix", "Entertainment", 649.00, "expense", direction="debit")
 
     # 4. Weekend Dining Surges (Saturday & Sunday dining across 5 months)
     weekend_dates = [
@@ -81,22 +84,22 @@ def load_realistic_demo_dataset(conn) -> int:
         "2026-10-04", "2026-10-11", "2026-10-18"
     ]
     for wd in weekend_dates:
-        add_tx(wd, "BLUE TOKAI COFFEE ROASTERS", "Blue Tokai", "Food & Dining", 480.00, "expense")
-        add_tx(wd, "TOIT BREWPUB DINNER", "Toit", "Food & Dining", 2200.00, "expense")
+        add_tx(wd, "BLUE TOKAI COFFEE ROASTERS", "Blue Tokai", "Food & Dining", 480.00, "expense", direction="debit")
+        add_tx(wd, "TOIT BREWPUB DINNER", "Toit", "Food & Dining", 2200.00, "expense", direction="debit")
 
     # 5. Food & Dining surge in October to trigger Pace Shift
-    add_tx("2026-10-02", "BARBEQUE NATION FAMILY CELEBRATION", "Barbeque Nation", "Food & Dining", 4800.00, "expense")
-    add_tx("2026-10-08", "RESTAURANT TAJ DINING", "Taj", "Food & Dining", 6200.00, "expense")
+    add_tx("2026-10-02", "BARBEQUE NATION FAMILY CELEBRATION", "Barbeque Nation", "Food & Dining", 4800.00, "expense", direction="debit")
+    add_tx("2026-10-08", "RESTAURANT TAJ DINING", "Taj", "Food & Dining", 6200.00, "expense", direction="debit")
 
     # 6. Refund item
-    add_tx("2026-10-12", "REFUND SWIGGY WRONG ITEM CANCELLED", "Swiggy Refund", "Refund", 420.00, "refund")
+    add_tx("2026-10-12", "REFUND SWIGGY WRONG ITEM CANCELLED", "Swiggy Refund", "Refund", 420.00, "refund", direction="credit")
 
     # Insert into database
     cur.executemany("""
         INSERT INTO transactions (
             import_batch_id, date, raw_description, clean_merchant, category,
-            amount, type, currency, fingerprint, is_user_modified, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            amount, direction, type, currency, fingerprint, is_user_modified, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, transactions)
 
     conn.commit()

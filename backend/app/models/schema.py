@@ -9,6 +9,7 @@ class Transaction(BaseModel):
     clean_merchant: str
     category: str
     amount: float
+    direction: str = "debit"  # "debit", "credit", "unknown"
     type: str  # "expense", "income", "refund", "transfer", "p2p"
     currency: str = "INR"
     fingerprint: str
@@ -22,6 +23,7 @@ class CSVPreviewRow(BaseModel):
     parsed_merchant: Optional[str] = None
     parsed_category: Optional[str] = None
     parsed_amount: Optional[float] = None
+    parsed_direction: Optional[str] = "debit"
     parsed_type: Optional[str] = None
     status: str  # "valid", "error", "ambiguous"
     error_message: Optional[str] = None
@@ -58,6 +60,7 @@ class CSVImportResult(BaseModel):
     gross_credit_inflow: float = 0.0
     classified_expenses: float = 0.0
     transfers_outflow: float = 0.0
+    p2p_outgoing: float = 0.0
     p2p_incoming: float = 0.0
     refunds_inflow: float = 0.0
     net_spending: float = 0.0
@@ -86,6 +89,7 @@ class SpendingSummaryResponse(BaseModel):
     total_income: float
     total_refunds: float
     total_transfers: float
+    total_p2p_outgoing: float = 0.0
     total_p2p_incoming: float = 0.0
     gross_debit_outflow: float = 0.0
     gross_credit_inflow: float = 0.0
@@ -98,6 +102,9 @@ class SpendingSummaryResponse(BaseModel):
 
 class TransactionUpdate(BaseModel):
     clean_merchant: Optional[str] = None
+    category: Optional[str] = None
+    direction: Optional[str] = None
+    type: Optional[str] = None
     category: Optional[str] = None
     type: Optional[str] = None
 

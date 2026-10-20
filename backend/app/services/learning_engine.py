@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 import sqlite3
+from app.database import migrate_db
 
 MAJOR_BRAND_EXCLUSIONS = {
     'swiggy', 'zomato', 'amazon', 'flipkart', 'myntra', 'uber', 'ola',
@@ -17,7 +18,7 @@ DEFAULT_OPTIONS = [
         "label": "Friend or family",
         "category": "Personal & Peer",
         "transaction_type": "p2p",
-        "description": "Money sent to friends, relatives, or personal contacts"
+        "description": "Payments to or from friends, relatives, or personal contacts (preserves debit/credit direction)"
     },
     {
         "id": "rent_household",
@@ -61,6 +62,7 @@ def generate_payee_questions_for_batch(conn: sqlite3.Connection, batch_id: str) 
     Examines newly imported transactions for recurring or high-value unclassified payees.
     Generates non-blocking, one-tap questions for payees without known brand rules or existing classifications.
     """
+    migrate_db(conn)
     cur = conn.cursor()
 
     known_learned_keys = set()
@@ -145,6 +147,7 @@ def answer_payee_question(
     custom_type: Optional[str] = None,
     notes: Optional[str] = None
 ) -> Dict[str, Any]:
+    migrate_db(conn)
     cur = conn.cursor()
     cur.execute("SELECT payee_key, payee_name, options_json FROM payee_questions WHERE id = ?", (question_id,))
     row = cur.fetchone()

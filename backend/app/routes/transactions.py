@@ -65,13 +65,14 @@ def list_transactions(
     offset: int = Query(0, ge=0),
     category: Optional[str] = None,
     merchant: Optional[str] = None,
+    direction: Optional[str] = None,
     tx_type: Optional[str] = None,
     search: Optional[str] = None
 ):
     conn = get_connection()
     try:
         cur = conn.cursor()
-        query = "SELECT id, import_batch_id, date, raw_description, clean_merchant, category, amount, type, currency, fingerprint, is_user_modified, created_at FROM transactions WHERE 1=1"
+        query = "SELECT id, import_batch_id, date, raw_description, clean_merchant, category, amount, direction, type, currency, fingerprint, is_user_modified, created_at FROM transactions WHERE 1=1"
         params = []
 
         if category:
@@ -80,6 +81,9 @@ def list_transactions(
         if merchant:
             query += " AND clean_merchant = ?"
             params.append(merchant)
+        if direction:
+            query += " AND direction = ?"
+            params.append(direction)
         if tx_type:
             query += " AND type = ?"
             params.append(tx_type)
@@ -88,7 +92,7 @@ def list_transactions(
             params.extend([f"%{search}%", f"%{search}%"])
 
         # Count total
-        count_query = query.replace("SELECT id, import_batch_id, date, raw_description, clean_merchant, category, amount, type, currency, fingerprint, is_user_modified, created_at", "SELECT COUNT(*)")
+        count_query = query.replace("SELECT id, import_batch_id, date, raw_description, clean_merchant, category, amount, direction, type, currency, fingerprint, is_user_modified, created_at", "SELECT COUNT(*)")
         cur.execute(count_query, params)
         total_count = cur.fetchone()[0]
 
@@ -108,11 +112,12 @@ def list_transactions(
                 "clean_merchant": r[4],
                 "category": r[5],
                 "amount": r[6],
-                "type": r[7],
-                "currency": r[8],
-                "fingerprint": r[9],
-                "is_user_modified": bool(r[10]),
-                "created_at": r[11]
+                "direction": r[7],
+                "type": r[8],
+                "currency": r[9],
+                "fingerprint": r[10],
+                "is_user_modified": bool(r[11]),
+                "created_at": r[12]
             })
 
         return {
@@ -137,6 +142,9 @@ def update_transaction(tx_id: int, payload: TransactionUpdate):
         if payload.category is not None:
             updates.append("category = ?")
             params.append(payload.category)
+        if payload.direction is not None:
+            updates.append("direction = ?")
+            params.append(payload.direction)
         if payload.type is not None:
             updates.append("type = ?")
             params.append(payload.type)

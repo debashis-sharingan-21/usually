@@ -1,6 +1,7 @@
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Any, Optional
 import sqlite3
+from app.database import migrate_db
 
 WEEKDAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -16,6 +17,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
 
     Strict safeguards prevent manufacturing habits from sparse history.
     """
+    migrate_db(conn)
     cur = conn.cursor()
 
     # Load feedback table to respect muted or confirmed habits
@@ -36,7 +38,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
     cur.execute("""
         SELECT COUNT(*), MIN(date), MAX(date)
         FROM transactions
-        WHERE type IN ('expense', 'p2p') AND category != 'Transfers'
+        WHERE direction = 'debit' AND type IN ('expense', 'p2p') AND category != 'Transfers'
     """)
     total_txns, min_date_str, max_date_str = cur.fetchone()
 
@@ -54,7 +56,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
     cur.execute("""
         SELECT clean_merchant, category, COUNT(*) as cnt
         FROM transactions
-        WHERE type IN ('expense', 'p2p') AND category != 'Transfers'
+        WHERE direction = 'debit' AND type IN ('expense', 'p2p') AND category != 'Transfers'
         GROUP BY clean_merchant
         HAVING cnt >= 4
     """)
@@ -67,7 +69,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
         cur.execute("""
             SELECT date, amount
             FROM transactions
-            WHERE clean_merchant = ? AND type IN ('expense', 'p2p')
+            WHERE clean_merchant = ? AND direction = 'debit' AND type IN ('expense', 'p2p')
             ORDER BY date ASC
         """, (merchant,))
         tx_rows = cur.fetchall()
@@ -145,7 +147,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
     cur.execute("""
         SELECT DISTINCT strftime('%Y-%m', date) as m
         FROM transactions
-        WHERE type IN ('expense', 'p2p') AND category != 'Transfers'
+        WHERE direction = 'debit' AND type IN ('expense', 'p2p') AND category != 'Transfers'
         ORDER BY m ASC
     """)
     all_recorded_months = [r[0] for r in cur.fetchall()]
@@ -156,7 +158,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
             SELECT clean_merchant, category, COUNT(DISTINCT strftime('%Y-%m', date)) as active_months,
                    COUNT(*) as total_orders, SUM(amount) as total_amt, MAX(date) as last_seen
             FROM transactions
-            WHERE type IN ('expense', 'p2p') AND category != 'Transfers'
+            WHERE direction = 'debit' AND type IN ('expense', 'p2p') AND category != 'Transfers'
             GROUP BY clean_merchant
             HAVING active_months >= 3
         """)
@@ -181,7 +183,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
                 cur.execute("""
                     SELECT COUNT(*), COALESCE(SUM(amount), 0.0)
                     FROM transactions
-                    WHERE clean_merchant = ? AND strftime('%Y-%m', date) = ?
+                    WHERE clean_merchant = ? AND direction = 'debit' AND strftime('%Y-%m', date) = ?
                 """, (merchant, cur_month_str))
                 cur_m_orders, cur_m_amt = cur.fetchone()
 
@@ -224,7 +226,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
         cur.execute("""
             SELECT category, SUM(amount)
             FROM transactions
-            WHERE type IN ('expense', 'p2p') AND category NOT IN ('Transfers', 'General')
+            WHERE direction = 'debit' AND type IN ('expense', 'p2p') AND category NOT IN ('Transfers', 'General')
               AND strftime('%Y-%m', date) = ?
               AND CAST(strftime('%d', date) AS INTEGER) <= ?
             GROUP BY category
@@ -239,7 +241,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
             cur.execute("""
                 SELECT strftime('%Y-%m', date) as m, SUM(amount)
                 FROM transactions
-                WHERE category = ? AND type IN ('expense', 'p2p')
+                WHERE category = ? AND direction = 'debit' AND type IN ('expense', 'p2p')
                   AND strftime('%Y-%m', date) < ?
                   AND CAST(strftime('%d', date) AS INTEGER) <= ?
                 GROUP BY m
@@ -291,7 +293,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
         cur.execute("""
             SELECT clean_merchant, category, AVG(amount), COUNT(*)
             FROM transactions
-            WHERE type IN ('expense', 'p2p') AND category != 'Transfers'
+            WHERE direction = 'debit' AND type IN ('expense', 'p2p') AND category != 'Transfers'
               AND strftime('%Y-%m', date) = ?
             GROUP BY clean_merchant
             HAVING COUNT(*) >= 2
@@ -303,7 +305,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
             cur.execute("""
                 SELECT AVG(amount), COUNT(DISTINCT strftime('%Y-%m', date))
                 FROM transactions
-                WHERE clean_merchant = ? AND type IN ('expense', 'p2p')
+                WHERE clean_merchant = ? AND direction = 'debit' AND type IN ('expense', 'p2p')
                   AND strftime('%Y-%m', date) < ?
             """, (merchant_name, cur_month_str))
             prior_stats = cur.fetchone()
@@ -346,7 +348,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
     cur.execute("""
         SELECT category, COUNT(*) as cnt, SUM(amount) as total_amt
         FROM transactions
-        WHERE type IN ('expense', 'p2p') AND category NOT IN ('Transfers', 'General')
+        WHERE direction = 'debit' AND type IN ('expense', 'p2p') AND category NOT IN ('Transfers', 'General')
         GROUP BY category
         HAVING cnt >= 12
     """)
@@ -363,7 +365,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
                 SUM(CASE WHEN CAST(strftime('%w', date) AS INTEGER) IN (0, 6) THEN 1 ELSE 0 END) as weekend_txns,
                 MAX(date) as last_seen
             FROM transactions
-            WHERE category = ? AND type IN ('expense', 'p2p')
+            WHERE category = ? AND direction = 'debit' AND type IN ('expense', 'p2p')
         """, (cat_name,))
         we_amt, wd_amt, we_txns, last_seen = cur.fetchone()
         we_amt = we_amt or 0.0
