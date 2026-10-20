@@ -186,11 +186,11 @@ body {
 }
 
 .animate-fade-in {
-  animation: fadeIn 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .animate-slide-up {
-  animation: slideUpShort 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: slideUpShort 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Accessible Reduced-Motion Support */

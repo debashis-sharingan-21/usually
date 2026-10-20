@@ -83,7 +83,7 @@ export const Navbar: React.FC = () => {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`text-xs px-3.5 py-1.5 rounded-lg transition-all font-medium flex items-center gap-1.5 ${
+                  className={`text-xs px-3.5 py-1.5 rounded-lg transition-all duration-150 font-medium flex items-center gap-1.5 ${
                     isActive
                       ? 'bg-[#FCFBF7] text-[#292D29] border border-[#DFD9CA] shadow-2xs'
                       : 'text-[#606860] hover:text-[#292D29] hover:bg-[#EEEBDD]'
@@ -234,7 +234,7 @@ export const Navbar: React.FC = () => {
             <Link
               key={link.href}
               href={link.href}
-              className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[11px] font-medium transition-all ${
+              className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[11px] font-medium transition-all duration-150 ${
                 isActive
                   ? 'text-[#365844]'
                   : 'text-[#8A928A] hover:text-[#292D29]'

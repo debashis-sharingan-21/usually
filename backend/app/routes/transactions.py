@@ -174,12 +174,13 @@ def update_transaction(tx_id: int, payload: TransactionUpdate):
 @router.delete("")
 def delete_all_transactions():
     """Privacy control: permanently removes all imported transactions and batches from local machine."""
-    conn = get_connection()
+    active_ctx = get_active_context()
+    conn = get_connection(active_ctx)
     try:
         with conn:
             conn.execute("DELETE FROM transactions")
             conn.execute("DELETE FROM import_batches")
             conn.execute("DELETE FROM habit_feedback")
-        return {"status": "success", "message": "All transactions and batches cleared permanently from local disk."}
+        return {"status": "success", "message": f"All transactions and batches cleared permanently for {active_ctx} context."}
     finally:
         conn.close()

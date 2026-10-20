@@ -3,6 +3,8 @@ from typing import Dict, Any, List, Optional
 import sqlite3
 from app.database import migrate_db
 
+_SCHEMA_VERIFIED: bool = False
+
 def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     """
     Computes deterministic accounting summary combining direction and classification:
@@ -14,12 +16,15 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     - Gross credit inflow: all money received
     - Net cash flow: total income + p2p incoming + refunds - consumer expenses
     """
+    global _SCHEMA_VERIFIED
     cur = conn.cursor()
-    # Ensure migration only if needed
-    cur.execute("PRAGMA table_info(transactions)")
-    cols = [c[1] for c in cur.fetchall()]
-    if "direction" not in cols or "ref_id" not in cols:
-        migrate_db(conn)
+    # Ensure migration only if needed (check once per runtime cycle)
+    if not _SCHEMA_VERIFIED:
+        cur.execute("PRAGMA table_info(transactions)")
+        cols = [c[1] for c in cur.fetchall()]
+        if "direction" not in cols or "ref_id" not in cols:
+            migrate_db(conn)
+        _SCHEMA_VERIFIED = True
 
     # Consolidated single-pass aggregation query for all ledger totals and bounds
     cur.execute("""
@@ -69,13 +74,14 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
 
     # Reconciliation equations:
     # 1. Gross account balance change = gross credit inflow - gross debit outflow
+    # Net cash flow represents the true net change in account cash position
     net_balance_change = round(gross_credit_inflow - gross_debit_outflow, 2)
+    net_cash_flow = net_balance_change
 
     # 2. Consumer living surplus/margin = external inflows (income + p2p in + refunds) - living expenses
-    # Excludes non-consumer internal account transfers
-    external_inflows = total_income + total_p2p_incoming + total_refunds
+    # Excludes non-consumer internal account movements (transfers in & credit card payoffs out)
+    external_inflows = round(total_income + total_p2p_incoming + total_refunds, 2)
     consumer_margin = round(external_inflows - total_expenses, 2)
-    net_cash_flow = consumer_margin
 
     # Top Merchants (consumer debit expenses only)
     cur.execute("""

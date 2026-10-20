@@ -1,8 +1,7 @@
 "use client";
 
-import Lenis from "lenis";
 import { useEffect, useState } from "react";
-import { gsap } from "./gsap";
+import Lenis from "lenis";
 
 export function useLenis() {
   const [lenis, setLenis] = useState<Lenis | null>(null);
@@ -10,25 +9,34 @@ export function useLenis() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
+    // Respect reduced-motion preferences strictly
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) {
+      return;
+    }
+
+    // Initialize Lenis without wheel/touch scroll hijacking
+    // Preserves native trackpad and wheel responsiveness while enabling programmatic smooth transitions
     const instance = new Lenis({
-      duration: 1.2,
+      duration: 0.8,
       easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smoothWheel: true,
+      smoothWheel: false, // Prevents scroll hijacking
+      syncTouch: false,   // Preserves native mobile gestures
     });
 
     (window as any).lenis = instance;
     setLenis(instance);
 
-    const tick = (time: number) => {
-      instance.raf(time * 1000);
+    let rafId: number;
+    const raf = (time: number) => {
+      instance.raf(time);
+      rafId = requestAnimationFrame(raf);
     };
-
-    gsap.ticker.add(tick);
-    gsap.ticker.lagSmoothing(0);
+    rafId = requestAnimationFrame(raf);
 
     return () => {
+      cancelAnimationFrame(rafId);
       instance.destroy();
-      gsap.ticker.remove(tick);
     };
   }, []);
 

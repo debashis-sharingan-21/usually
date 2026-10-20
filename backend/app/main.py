@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import init_db
 from app.routes.transactions import router as transactions_router
 from app.routes.habits import router as habits_router
+from app.routes.notifications import router as notifications_router
 from app.routes.system import router as system_router
 from app.routes.learning import router as learning_router
 
@@ -35,6 +36,7 @@ app.add_middleware(
 
 app.include_router(transactions_router)
 app.include_router(habits_router)
+app.include_router(notifications_router)
 app.include_router(system_router)
 app.include_router(learning_router)
 

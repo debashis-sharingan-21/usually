@@ -138,7 +138,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
                     "min_evidence_met": True,
                     "observation_window": f"Last {len(target_calendar_days)} {w_name}s",
                     "last_observed_date": last_seen_dt.strftime("%Y-%m-%d"),
-                    "freshness_status": "fresh" if (today_dt - last_seen_dt).days <= 7 else "quiet_recent",
+                    "freshness_status": "fresh" if (today_dt - last_seen_dt).days <= 14 else ("quiet_recent" if (today_dt - last_seen_dt).days <= 30 else "dormant"),
                     "status": status,
                     "tone": current_tone,
                     "evidence": evidence
@@ -204,6 +204,14 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
                     "last_observed_date": last_seen_str,
                 }
 
+                try:
+                    last_seen_d = datetime.strptime(last_seen_str, "%Y-%m-%d").date()
+                    days_since_m = (today_dt - last_seen_d).days
+                except Exception:
+                    days_since_m = 999
+
+                freshness = "fresh" if (cur_m_orders > 0 or days_since_m <= 14) else ("quiet_recent" if days_since_m <= 30 else "dormant")
+
                 habits.append({
                     "habit_key": habit_key,
                     "habit_type": "multi_month_recurrent",
@@ -213,7 +221,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
                     "min_evidence_met": True,
                     "observation_window": f"Across {total_months_count} months ({active_m_count} active)",
                     "last_observed_date": last_seen_str,
-                    "freshness_status": "fresh" if cur_m_orders > 0 else "quiet_recent",
+                    "freshness_status": freshness,
                     "status": status,
                     "tone": current_tone,
                     "evidence": evidence
@@ -394,6 +402,14 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
                     "last_observed_date": last_seen,
                 }
 
+                try:
+                    last_seen_we_d = datetime.strptime(last_seen, "%Y-%m-%d").date()
+                    days_since_we = (today_dt - last_seen_we_d).days
+                except Exception:
+                    days_since_we = 999
+
+                freshness_we = "fresh" if days_since_we <= 14 else ("quiet_recent" if days_since_we <= 30 else "dormant")
+
                 habits.append({
                     "habit_key": habit_key,
                     "habit_type": "weekend_surge",
@@ -403,7 +419,7 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
                     "min_evidence_met": True,
                     "observation_window": f"Across {cat_tx_cnt} transactions",
                     "last_observed_date": last_seen,
-                    "freshness_status": "fresh",
+                    "freshness_status": freshness_we,
                     "status": status,
                     "tone": current_tone,
                     "evidence": evidence

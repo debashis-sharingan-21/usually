@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS payee_questions (
 CREATE INDEX IF NOT EXISTS idx_questions_status ON payee_questions(status);
 """
 
-_ACTIVE_CONTEXT: str = "personal"
+_ACTIVE_CONTEXT: Optional[str] = None
 
 def get_db_path(context: str = "personal") -> str:
     custom_personal = os.environ.get("USUALLY_DB_PATH")
@@ -98,6 +98,9 @@ def get_db_path(context: str = "personal") -> str:
 
 def get_active_context() -> str:
     global _ACTIVE_CONTEXT
+    if _ACTIVE_CONTEXT is not None:
+        return _ACTIVE_CONTEXT
+    _ACTIVE_CONTEXT = "personal"
     personal_path = get_db_path("personal")
     try:
         if os.path.exists(personal_path):

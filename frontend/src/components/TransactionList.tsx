@@ -173,7 +173,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
                     const isEditing = editingId === t.id;
 
                     return (
-                      <tr key={t.id} className="hover:bg-[#F7F5EE]/70 transition-colors">
+                      <tr key={t.id} className="hover:bg-[#F7F5EE]/70 transition-colors duration-150">
                         <td className="py-3 px-4 font-mono text-[#606860] whitespace-nowrap">
                           {t.date}
                         </td>

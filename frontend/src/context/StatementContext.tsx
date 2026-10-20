@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import {
   fetchHealth,
   fetchSummary,
@@ -27,6 +27,7 @@ interface StatementContextType {
   habits: HabitObservation[];
   questions: PayeeQuestion[];
   loading: boolean;
+  loadErrors: Record<string, string>;
   isImportOpen: boolean;
   isDemoLoading: boolean;
   setIsImportOpen: (open: boolean) => void;
@@ -46,28 +47,63 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [notifications, setNotifications] = useState<HabitObservation[]>([]);
   const [habits, setHabits] = useState<HabitObservation[]>([]);
   const [questions, setQuestions] = useState<PayeeQuestion[]>([]);
+  const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isDemoLoading, setIsDemoLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const isFetchingRef = useRef(false);
 
   const loadAll = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
-      const [h, s, n, hab, q] = await Promise.all([
+      const [hRes, sRes, nRes, habRes, qRes] = await Promise.allSettled([
         fetchHealth(),
         fetchSummary(),
         fetchNotifications(),
         fetchHabits(),
         fetchQuestions(),
       ]);
-      setHealth(h);
-      setSummary(s);
-      setNotifications(n);
-      setHabits(hab);
-      setQuestions(q);
+
+      const errors: Record<string, string> = {};
+
+      if (hRes.status === 'fulfilled') {
+        setHealth(hRes.value);
+      } else {
+        errors.health = hRes.reason?.message || 'Failed to fetch health';
+      }
+
+      if (sRes.status === 'fulfilled') {
+        setSummary(sRes.value);
+      } else {
+        errors.summary = sRes.reason?.message || 'Failed to fetch summary';
+      }
+
+      if (nRes.status === 'fulfilled') {
+        setNotifications(nRes.value);
+      } else {
+        errors.notifications = nRes.reason?.message || 'Failed to fetch notifications';
+        console.warn('Notifications request failed:', nRes.reason);
+      }
+
+      if (habRes.status === 'fulfilled') {
+        setHabits(habRes.value);
+      } else {
+        errors.habits = habRes.reason?.message || 'Failed to fetch habits';
+      }
+
+      if (qRes.status === 'fulfilled') {
+        setQuestions(qRes.value);
+      } else {
+        errors.questions = qRes.reason?.message || 'Failed to fetch questions';
+      }
+
+      setLoadErrors(errors);
     } catch (e) {
-      console.error('Failed to load application data:', e);
+      console.error('Unexpected error loading application data:', e);
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
     }
   }, []);
 
@@ -86,16 +122,29 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const handleSwitchContext = async (targetContext: 'personal' | 'demo') => {
     try {
+      // Clear data partition immediately to avoid stale cross-context state
+      setLoading(true);
+      setSummary(null);
+      setNotifications([]);
+      setHabits([]);
+      setQuestions([]);
+      setLoadErrors({});
       await switchContext(targetContext);
       await loadAll();
     } catch (e) {
       console.error(e);
+      setLoading(false);
     }
   };
 
   const handleLoadDemo = async () => {
     setIsDemoLoading(true);
     try {
+      setLoading(true);
+      setSummary(null);
+      setNotifications([]);
+      setHabits([]);
+      setQuestions([]);
       await seedDemoData();
       await loadAll();
     } catch (e) {
@@ -108,10 +157,16 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const handleClearData = async () => {
     if (window.confirm('Are you sure you want to delete all transactions and habits from local storage?')) {
       try {
+        setLoading(true);
+        setSummary(null);
+        setNotifications([]);
+        setHabits([]);
+        setQuestions([]);
         await clearAllData();
         await loadAll();
       } catch (e) {
         console.error(e);
+        setLoading(false);
       }
     }
   };
@@ -129,6 +184,7 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         habits,
         questions,
         loading,
+        loadErrors,
         isImportOpen,
         isDemoLoading,
         setIsImportOpen,

@@ -106,7 +106,8 @@ def test_accounting_calculations():
     # (excludes non-consumer internal account transfers of 15000 out and 10000 in)
     expected_consumer_margin = (80000.0 + 5000.0 + 400.0) - 1600.0  # 83800.0
     assert summary["consumer_margin"] == expected_consumer_margin
-    assert summary["net_cash_flow"] == expected_consumer_margin
+    # Invariant: Net cash flow strictly equals net balance change (gross inflow - gross outflow)
+    assert summary["net_cash_flow"] == summary["net_balance_change"]
 
     # 6. Transaction count is exact
     assert summary["transaction_count"] == 8

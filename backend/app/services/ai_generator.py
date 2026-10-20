@@ -241,7 +241,7 @@ Rules:
 - Output JSON format with keys: "headline" and "message".
 """
     try:
-        with httpx.Client(timeout=4.0) as client:
+        with httpx.Client(timeout=1.5) as client:
             resp = client.post(
                 f"{OLLAMA_BASE_URL}/api/generate",
                 json={

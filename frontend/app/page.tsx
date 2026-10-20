@@ -32,6 +32,7 @@ export default function HomePage() {
     notifications,
     questions,
     loading,
+    loadErrors,
     loadAll,
     setIsImportOpen,
     handleLoadDemo,
@@ -78,6 +79,14 @@ export default function HomePage() {
       {/* Pending Payee Clarification Banner */}
       {questions.length > 0 && (
         <PayeeQuestionsBanner questions={questions} onAnswered={loadAll} />
+      )}
+
+      {/* Honest Diagnosable Error Banner if Auxiliary Request Fails */}
+      {loadErrors.notifications && (
+        <div className="p-3 bg-[#FCFBF7] border border-[#C85A32]/40 rounded-xl text-xs text-[#C85A32] flex items-center justify-between font-mono animate-fade-in">
+          <span>Notice: Could not load notifications ({loadErrors.notifications}). Core accounting data remains active.</span>
+          <button onClick={loadAll} className="underline hover:text-[#292D29] font-medium ml-3 cursor-pointer">Retry</button>
+        </div>
       )}
 
       {!hasData && !loading ? (
@@ -178,7 +187,7 @@ export default function HomePage() {
 
           {/* Featured Observation Sheet */}
           {featured ? (
-            <article className="paper-sheet p-6 sm:p-8 space-y-4">
+            <article className="paper-sheet p-6 sm:p-8 space-y-4 animate-slide-up">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-[#EEEBDD] border border-[#DFD9CA]">
