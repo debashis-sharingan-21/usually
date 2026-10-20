@@ -93,16 +93,18 @@ This is an automatically generated statement. Customer(s) are requested to immed
 Visit https://www.phonepe.com/terms-conditions/ for PhonePe Terms & Conditions
 """
     preview = parse_and_preview_csv(sample_phonepe_content)
-    # Total rows: 8 nonblank data rows (4 valid, 2 incomplete data rows, 2 footer notice rows)
-    assert preview["total_rows"] == 8
+    # Total rows: 6 nonblank transaction rows (4 valid, 2 incomplete data rows), 2 footer notice rows safely ignored
+    assert preview["total_rows"] == 6
     assert preview["valid_count"] == 4
-    assert preview["error_count"] == 4
+    assert preview["error_count"] == 2
+    assert preview["ignored_footer_rows"] == 2
 
     conn = get_empty_db()
     result = execute_import(conn, "b1", "phonepe_test.csv", sample_phonepe_content, preview["suggested_mapping"])
-    assert result["total_rows"] == 8
+    assert result["total_rows"] == 6
     assert result["accepted_rows"] == 4
-    assert result["rejected_rows"] == 4
+    assert result["rejected_rows"] == 2
+    assert result["ignored_footer_rows"] == 2
     assert any("Incomplete record" in err["error"] for err in result["errors"])
 
     # Verify explicit Debit and Credit interpretation
@@ -119,10 +121,11 @@ Visit https://www.phonepe.com/terms-conditions/ for PhonePe Terms & Conditions
 
     # Test re-importing the same CSV: duplicate prevention
     result_dup = execute_import(conn, "b2", "phonepe_test.csv", sample_phonepe_content, preview["suggested_mapping"])
-    assert result_dup["total_rows"] == 8
+    assert result_dup["total_rows"] == 6
     assert result_dup["accepted_rows"] == 0
     assert result_dup["duplicate_rows"] == 4
-    assert result_dup["rejected_rows"] == 4
+    assert result_dup["rejected_rows"] == 2
+    assert result_dup["ignored_footer_rows"] == 2
 
 def test_actual_downloaded_phonepe_export():
     """
@@ -136,11 +139,12 @@ def test_actual_downloaded_phonepe_export():
         content = f.read()
 
     preview = parse_and_preview_csv(content)
-    # 471 scanned nonblank data rows, 467 valid, 4 incomplete/footer, 1 blank row skipped
-    assert preview["total_rows"] == 471
+    # 467 valid nonblank transaction rows, 4 footer notice rows safely ignored, 1 blank row skipped
+    assert preview["total_rows"] == 467
     assert preview["valid_count"] == 467
-    assert preview["error_count"] == 4
+    assert preview["error_count"] == 0
     assert preview["blank_rows_skipped"] == 1
+    assert preview["ignored_footer_rows"] == 4
     assert preview["is_confident"] is True
 
     mapping = preview["suggested_mapping"]
@@ -152,11 +156,12 @@ def test_actual_downloaded_phonepe_export():
 
     conn = get_empty_db()
     import_res = execute_import(conn, "batch_phonepe_actual", "PhonePe_Transaction_Statement.csv", content, mapping)
-    assert import_res["total_rows"] == 471
+    assert import_res["total_rows"] == 467
     assert import_res["accepted_rows"] == 467
-    assert import_res["rejected_rows"] == 4
+    assert import_res["rejected_rows"] == 0
     assert import_res["duplicate_rows"] == 0
     assert import_res["blank_rows_skipped"] == 1
+    assert import_res["ignored_footer_rows"] == 4
 
     # Verify separate financial metrics
     assert import_res["gross_debit_outflow"] == 75880.89
@@ -186,9 +191,9 @@ def test_actual_downloaded_phonepe_export():
 
     # Re-import to verify exact duplicate suppression & transparent error reporting
     reimport_res = execute_import(conn, "batch_phonepe_dup", "PhonePe_Transaction_Statement.csv", content, mapping)
-    assert reimport_res["total_rows"] == 471
+    assert reimport_res["total_rows"] == 467
     assert reimport_res["accepted_rows"] == 0
     assert reimport_res["duplicate_rows"] == 467
-    assert reimport_res["rejected_rows"] == 4
+    assert reimport_res["rejected_rows"] == 0
     assert reimport_res["blank_rows_skipped"] == 1
-    assert reimport_res["duplicate_rows"] == 467
+    assert reimport_res["ignored_footer_rows"] == 4

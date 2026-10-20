@@ -132,7 +132,8 @@ def test_phonepe_preview_and_import_recovery(clean_test_dbs):
     assert p_resp.status_code == 200
     data = p_resp.json()
     assert data["valid_count"] == 2
-    assert data["error_count"] == 1  # Footer notice correctly marked incomplete/error
+    assert data["error_count"] == 0  # Informational footer notice cleanly filtered as footer metadata
+    assert data["ignored_footer_rows"] == 1
 
     mapping = data["suggested_mapping"]
     i_resp = client.post(
@@ -143,4 +144,5 @@ def test_phonepe_preview_and_import_recovery(clean_test_dbs):
     assert i_resp.status_code == 200
     i_data = i_resp.json()
     assert i_data["accepted_rows"] == 2
-    assert i_data["rejected_rows"] == 1
+    assert i_data["rejected_rows"] == 0
+    assert i_data["ignored_footer_rows"] == 1

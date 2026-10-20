@@ -42,6 +42,8 @@ export interface CSVPreviewResponse {
   confidence_reasons: string[];
   detected_date_range?: [string, string];
   sample_total_expenses: number;
+  blank_rows_skipped?: number;
+  ignored_footer_rows?: number;
 }
 
 export interface CSVImportResult {
@@ -65,6 +67,7 @@ export interface CSVImportResult {
   refunds_inflow: number;
   net_spending: number;
   blank_rows_skipped?: number;
+  ignored_footer_rows?: number;
 }
 
 export interface HabitObservation {

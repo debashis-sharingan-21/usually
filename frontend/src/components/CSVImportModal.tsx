@@ -460,9 +460,15 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
                   </div>
                 </div>
 
-                {importResult.blank_rows_skipped !== undefined && importResult.blank_rows_skipped > 0 && (
-                  <div className="text-[10px] text-[#8A928A] pt-1 border-t border-[#DFD9CA]">
-                    • {importResult.blank_rows_skipped} blank row(s) safely skipped
+                {((importResult.blank_rows_skipped !== undefined && importResult.blank_rows_skipped > 0) ||
+                  (importResult.ignored_footer_rows !== undefined && importResult.ignored_footer_rows > 0)) && (
+                  <div className="text-[10px] text-[#8A928A] pt-1 border-t border-[#DFD9CA] flex items-center gap-3">
+                    {importResult.blank_rows_skipped !== undefined && importResult.blank_rows_skipped > 0 && (
+                      <span>• {importResult.blank_rows_skipped} blank row(s) safely skipped</span>
+                    )}
+                    {importResult.ignored_footer_rows !== undefined && importResult.ignored_footer_rows > 0 && (
+                      <span>• {importResult.ignored_footer_rows} footer notice(s) safely filtered</span>
+                    )}
                   </div>
                 )}
               </div>

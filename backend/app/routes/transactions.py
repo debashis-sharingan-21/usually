@@ -16,6 +16,7 @@ async def preview_csv(
     try:
         content_bytes = await file.read()
         content = content_bytes.decode("utf-8", errors="replace")
+        content = content.replace("\r\n", "\n").replace("\r", "\n")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read CSV file: {str(e)}")
 
@@ -42,6 +43,7 @@ async def import_csv(
     try:
         content_bytes = await file.read()
         content = content_bytes.decode("utf-8", errors="replace")
+        content = content.replace("\r\n", "\n").replace("\r", "\n")
         col_mapping = json.loads(mapping)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid payload or CSV: {str(e)}")

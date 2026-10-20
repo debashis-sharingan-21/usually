@@ -43,6 +43,8 @@ class CSVPreviewResponse(BaseModel):
     confidence_reasons: List[str] = []
     detected_date_range: Optional[Tuple[str, str]] = None
     sample_total_expenses: float = 0.0
+    blank_rows_skipped: int = 0
+    ignored_footer_rows: int = 0
 
 class CSVImportResult(BaseModel):
     batch_id: str
@@ -65,6 +67,7 @@ class CSVImportResult(BaseModel):
     refunds_inflow: float = 0.0
     net_spending: float = 0.0
     blank_rows_skipped: int = 0
+    ignored_footer_rows: int = 0
 
 class HabitObservation(BaseModel):
     habit_key: str

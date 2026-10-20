@@ -56,22 +56,44 @@ KNOWN_MERCHANT_PATTERNS = [
 FOOTER_DISCLAIMER_KEYWORDS = [
     "automatically generated statement",
     "terms & conditions",
+    "terms-conditions",
     "privacy policy",
     "fictitious offers",
     "confidential and intended for the recipient",
     "support.phonepe.com",
     "customer(s) are requested to immediately notify",
+    "strictly forbidden to share",
+    "confidential information such as otp",
+    "unauthorized transaction",
+    "report an unauthorized transaction",
+    "do not fall prey to fictitious",
+    "end of statement",
+    "*** end of statement ***",
+    "this statement is computer generated",
 ]
 
 def is_footer_disclaimer_row(row: List[str]) -> bool:
+    if not row:
+        return False
     combined = " ".join(row).lower()
-    return any(keyword in combined for keyword in FOOTER_DISCLAIMER_KEYWORDS)
+    if any(keyword in combined for keyword in FOOTER_DISCLAIMER_KEYWORDS):
+        return True
+    first_cell = row[0].strip().lower()
+    if first_cell.startswith("note:") or first_cell.startswith("disclaimer:") or first_cell.startswith("important:"):
+        return True
+    return False
 
 def is_header_candidate_row(row: List[str]) -> bool:
     lower_row = [c.strip().lower() for c in row if c.strip()]
-    has_date = any("date" in c for c in lower_row)
+    if len(lower_row) < 2:
+        return False
+    has_date = any("date" in c or "time" in c or "day" in c for c in lower_row)
     has_amount_or_details = any(
-        any(k in c for k in ["amount", "debit", "credit", "withdrawal", "details", "narration", "description", "particulars"])
+        any(k in c for k in [
+            "amount", "debit", "credit", "withdrawal", "deposit",
+            "details", "narration", "description", "particulars",
+            "spent", "received", "balance", "total", "dr", "cr"
+        ])
         for c in lower_row
     )
     return has_date and has_amount_or_details
@@ -308,28 +330,66 @@ def assess_column_confidence(headers: List[str], mapping: Dict[str, str]) -> Tup
     return min(round(confidence, 2), 1.0), reasons
 
 def extract_rows_and_headers(csv_content: str) -> Tuple[List[str], List[List[str]], Dict[str, str], int]:
-    f = io.StringIO(csv_content)
-    try:
-        sample = f.read(4096)
-        f.seek(0)
-        dialect = csv.Sniffer().sniff(sample)
-    except Exception:
-        dialect = csv.excel
+    normalized = csv_content.replace("\r\n", "\n").replace("\r", "\n")
+    raw_lines = normalized.split("\n")
 
-    reader = csv.reader(f, dialect=dialect)
-    all_raw_lines = list(reader)
+    candidate_delimiters = [",", "\t", ";", "|"]
+    header_idx: Optional[int] = None
+    detected_delimiter: Optional[str] = None
+    headers: List[str] = []
 
-    headers = []
-    data_rows = []
-    metadata = {}
-    header_idx = None
-
-    for idx, r in enumerate(all_raw_lines):
-        if is_header_candidate_row(r):
-            header_idx = idx
-            headers = [c.strip() for c in r]
+    # 1. Scan the first 50 lines with candidate delimiters to find the authoritative header row
+    for line_idx, line in enumerate(raw_lines[:50]):
+        trimmed = line.strip()
+        if not trimmed:
+            continue
+        for delim in candidate_delimiters:
+            try:
+                row_cells = next(csv.reader([trimmed], delimiter=delim))
+                cleaned_cells = [c.strip().lstrip("\t").strip() for c in row_cells if c.strip()]
+                if is_header_candidate_row(cleaned_cells):
+                    header_idx = line_idx
+                    detected_delimiter = delim
+                    headers = [c.strip().lstrip("\t").strip() for c in row_cells]
+                    break
+            except Exception:
+                continue
+        if header_idx is not None:
             break
-        else:
+
+    # 2. If no candidate header row recognized yet, fall back to safe sniffing constrained strictly to single-char delimiters
+    if detected_delimiter is None:
+        try:
+            sample_lines = [l for l in raw_lines[:50] if l.strip()]
+            sample_text = "\n".join(sample_lines[:20])
+            sniffed = csv.Sniffer().sniff(sample_text, delimiters=[",", "\t", ";", "|"])
+            if sniffed.delimiter in candidate_delimiters:
+                detected_delimiter = sniffed.delimiter
+            else:
+                detected_delimiter = ","
+        except Exception:
+            detected_delimiter = ","
+
+    # 3. Parse full file with the validated delimiter
+    reader = csv.reader(io.StringIO(normalized), delimiter=detected_delimiter)
+    all_parsed_lines = list(reader)
+
+    metadata: Dict[str, str] = {}
+    if header_idx is None:
+        for idx, r in enumerate(all_parsed_lines[:50]):
+            cleaned_r = [c.strip().lstrip("\t").strip() for c in r if c.strip()]
+            if is_header_candidate_row(cleaned_r):
+                header_idx = idx
+                headers = [c.strip().lstrip("\t").strip() for c in r]
+                break
+            else:
+                if len(r) == 2 and r[0].strip() and r[1].strip():
+                    metadata[r[0].strip()] = r[1].strip()
+                elif len(r) == 1 and ":" in r[0]:
+                    k, v = r[0].split(":", 1)
+                    metadata[k.strip()] = v.strip()
+    else:
+        for r in all_parsed_lines[:header_idx]:
             if len(r) == 2 and r[0].strip() and r[1].strip():
                 metadata[r[0].strip()] = r[1].strip()
             elif len(r) == 1 and ":" in r[0]:
@@ -337,20 +397,29 @@ def extract_rows_and_headers(csv_content: str) -> Tuple[List[str], List[List[str
                 metadata[k.strip()] = v.strip()
 
     if header_idx is None:
-        if all_raw_lines:
-            headers = [c.strip() for c in all_raw_lines[0]]
-            post_header_lines = all_raw_lines[1:]
+        if all_parsed_lines:
+            headers = [c.strip().lstrip("\t").strip() for c in all_parsed_lines[0]]
+            post_header_lines = all_parsed_lines[1:]
         else:
             post_header_lines = []
     else:
-        post_header_lines = all_raw_lines[header_idx + 1:]
+        post_header_lines = all_parsed_lines[header_idx + 1:]
 
+    data_rows: List[List[str]] = []
+    footer_rows: List[List[str]] = []
     blank_rows_skipped = 0
+
     for r in post_header_lines:
         if not r or not any(c.strip() for c in r):
             blank_rows_skipped += 1
-        else:
-            data_rows.append(r)
+            continue
+        if is_footer_disclaimer_row(r):
+            footer_rows.append(r)
+            continue
+        cleaned_row = [c.strip().lstrip("\t").strip() for c in r]
+        data_rows.append(cleaned_row)
+
+    metadata["ignored_footer_rows_count"] = str(len(footer_rows))
 
     return headers, data_rows, metadata, blank_rows_skipped
 
@@ -373,6 +442,7 @@ def parse_and_preview_csv(
     max_preview_rows: int = 50
 ) -> Dict[str, Any]:
     headers, all_raw_rows, metadata, blank_rows_skipped = extract_rows_and_headers(csv_content)
+    ignored_footer_rows = int(metadata.get("ignored_footer_rows_count", 0))
 
     if not headers:
         return {
@@ -390,6 +460,7 @@ def parse_and_preview_csv(
             "detected_date_range": None,
             "sample_total_expenses": 0.0,
             "blank_rows_skipped": blank_rows_skipped,
+            "ignored_footer_rows": ignored_footer_rows,
         }
 
     header_indices = {h: idx for idx, h in enumerate(headers)}
@@ -425,8 +496,8 @@ def parse_and_preview_csv(
         error_msg = None
 
         if is_footer_disclaimer_row(row):
-            status = "error"
-            error_msg = "Incomplete record: statement notice/footer"
+            ignored_footer_rows += 1
+            continue
         elif not date_col or date_col not in header_indices or header_indices[date_col] >= len(row):
             status = "error"
             error_msg = "Date column missing or unmapped"
@@ -585,6 +656,7 @@ def parse_and_preview_csv(
         "detected_date_range": date_range,
         "sample_total_expenses": round(sample_total_expenses, 2),
         "blank_rows_skipped": blank_rows_skipped,
+        "ignored_footer_rows": ignored_footer_rows,
     }
 
 def execute_import(
@@ -597,6 +669,7 @@ def execute_import(
 ) -> Dict[str, Any]:
     migrate_db(conn)
     headers, all_raw_rows, metadata, blank_rows_skipped = extract_rows_and_headers(csv_content)
+    ignored_footer_rows = int(metadata.get("ignored_footer_rows_count", 0))
 
     header_indices = {h: idx for idx, h in enumerate(headers)}
     date_col = mapping.get("date")
@@ -649,8 +722,7 @@ def execute_import(
         row_num = idx + 1
 
         if is_footer_disclaimer_row(row):
-            rejected_rows += 1
-            errors.append({"row": row_num, "error": "Incomplete record: statement notice/footer"})
+            ignored_footer_rows += 1
             continue
 
         if not date_col or date_col not in header_indices or header_indices[date_col] >= len(row):
@@ -850,7 +922,7 @@ def execute_import(
     return {
         "batch_id": batch_id,
         "filename": filename,
-        "total_rows": len(all_raw_rows),
+        "total_rows": accepted_rows + duplicate_rows + rejected_rows,
         "accepted_rows": accepted_rows,
         "duplicate_rows": duplicate_rows,
         "rejected_rows": rejected_rows,
@@ -868,4 +940,5 @@ def execute_import(
         "refunds_inflow": round(refunds_inflow, 2),
         "net_spending": net_spending,
         "blank_rows_skipped": blank_rows_skipped,
+        "ignored_footer_rows": ignored_footer_rows,
     }
