@@ -15,111 +15,137 @@ export const SpendingSummary: React.FC<SpendingSummaryProps> = ({ summary }) => 
 
   return (
     <div className="space-y-6">
-      {/* 4 Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {/* Total Expenses */}
-        <div className="p-4 rounded-2xl bg-[#12141d] border border-[#242938]">
-          <div className="flex items-center justify-between text-xs text-[#8e96ac] mb-1">
-            <span>Expenses</span>
-            <ArrowUpRight className="w-3.5 h-3.5 text-rose-400" />
+      {/* Editorial Section Header */}
+      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-[#DFD9CA] pb-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs uppercase tracking-widest text-[#365844] font-medium">
+              03 / Cash Flow & Pacing
+            </span>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA]">
+              {summary.transaction_count} ledger entries
+            </span>
           </div>
-          <div className="text-xl font-extrabold text-white font-mono">
+          <h2 className="font-serif text-2xl sm:text-3xl font-normal text-[#292D29] tracking-tight mt-1">
+            Financial summary and pacing benchmark.
+          </h2>
+        </div>
+        <p className="text-xs text-[#8A928A] max-w-xs sm:text-right font-sans">
+          Accurate double-entry principles. Transfers and credit card settlements are not double-counted as consumer spend.
+        </p>
+      </div>
+
+      {/* 4 Stat Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Total Expenses */}
+        <div className="p-5 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
+          <div className="flex items-center justify-between text-xs text-[#606860] mb-2 font-mono uppercase tracking-wider">
+            <span>Expenses</span>
+            <div className="p-1 rounded bg-[#C85A32]/10 text-[#C85A32]">
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </div>
+          </div>
+          <div className="text-2xl font-serif text-[#292D29]">
             ₹{summary.total_expenses.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </div>
-          <div className="text-[11px] text-[#8e96ac] mt-1">
-            Excludes transfers & CC bills
+          <div className="text-[11px] text-[#8A928A] mt-1.5 font-sans">
+            Excludes peer transfers & CC bills
           </div>
         </div>
 
         {/* Net Cash Flow */}
-        <div className="p-4 rounded-2xl bg-[#12141d] border border-[#242938]">
-          <div className="flex items-center justify-between text-xs text-[#8e96ac] mb-1">
+        <div className="p-5 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
+          <div className="flex items-center justify-between text-xs text-[#606860] mb-2 font-mono uppercase tracking-wider">
             <span>Net Cash Flow</span>
-            <div className={`w-2 h-2 rounded-full ${summary.net_cash_flow >= 0 ? 'bg-lime-400' : 'bg-rose-400'}`} />
+            <div className={`w-2 h-2 rounded-full ${summary.net_cash_flow >= 0 ? 'bg-[#365844]' : 'bg-[#C85A32]'}`} />
           </div>
-          <div className={`text-xl font-extrabold font-mono ${summary.net_cash_flow >= 0 ? 'text-lime-300' : 'text-rose-300'}`}>
+          <div className={`text-2xl font-serif ${summary.net_cash_flow >= 0 ? 'text-[#365844]' : 'text-[#C85A32]'}`}>
             ₹{summary.net_cash_flow.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </div>
-          <div className="text-[11px] text-[#8e96ac] mt-1">
-            Income minus net expenses
+          <div className="text-[11px] text-[#8A928A] mt-1.5 font-sans">
+            Verified income minus net spend
           </div>
         </div>
 
         {/* Total Income */}
-        <div className="p-4 rounded-2xl bg-[#12141d] border border-[#242938]">
-          <div className="flex items-center justify-between text-xs text-[#8e96ac] mb-1">
+        <div className="p-5 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
+          <div className="flex items-center justify-between text-xs text-[#606860] mb-2 font-mono uppercase tracking-wider">
             <span>Income & Credits</span>
-            <ArrowDownLeft className="w-3.5 h-3.5 text-lime-400" />
+            <div className="p-1 rounded bg-[#365844]/10 text-[#365844]">
+              <ArrowDownLeft className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div className="text-xl font-extrabold text-white font-mono">
+          <div className="text-2xl font-serif text-[#292D29]">
             ₹{summary.total_income.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </div>
-          <div className="text-[11px] text-[#8e96ac] mt-1">
-            Salaries & deposits
+          <div className="text-[11px] text-[#8A928A] mt-1.5 font-sans">
+            Salaries and confirmed deposits
           </div>
         </div>
 
         {/* Total Refunds */}
-        <div className="p-4 rounded-2xl bg-[#12141d] border border-[#242938]">
-          <div className="flex items-center justify-between text-xs text-[#8e96ac] mb-1">
+        <div className="p-5 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
+          <div className="flex items-center justify-between text-xs text-[#606860] mb-2 font-mono uppercase tracking-wider">
             <span>Refunds Credited</span>
-            <Shield className="w-3.5 h-3.5 text-cyan-400" />
+            <div className="p-1 rounded bg-[#EEEBDD] text-[#365844]">
+              <Shield className="w-3.5 h-3.5" />
+            </div>
           </div>
-          <div className="text-xl font-extrabold text-white font-mono">
+          <div className="text-2xl font-serif text-[#292D29]">
             ₹{summary.total_refunds.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </div>
-          <div className="text-[11px] text-[#8e96ac] mt-1">
-            Offsetting expenses
+          <div className="text-[11px] text-[#8A928A] mt-1.5 font-sans">
+            Offsetting return credits
           </div>
         </div>
       </div>
 
       {/* Spending Pace & Monthly Baseline Comparison */}
       {pace && (
-        <div className="p-5 rounded-2xl bg-[#141824] border border-[#262c3f]">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-lime-400/10 text-lime-400 border border-lime-400/20">
+        <div className="p-6 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="flex items-start gap-3.5">
+              <div className="p-2.5 rounded-xl bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA] mt-0.5">
                 <Gauge className="w-5 h-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                    Current Month Spending Pace ({pace.month})
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-serif text-lg font-normal text-[#292D29]">
+                    Current Month Pace ({pace.month})
                   </h3>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  <span className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full ${
                     pace.status === 'higher'
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      ? 'bg-[#C85A32]/10 text-[#C85A32] border border-[#C85A32]/30'
                       : pace.status === 'lower'
-                      ? 'bg-lime-400/20 text-lime-300 border border-lime-400/30'
-                      : 'bg-zinc-700/30 text-zinc-300 border border-zinc-700'
+                      ? 'bg-[#365844]/10 text-[#365844] border border-[#365844]/30'
+                      : 'bg-[#EEEBDD] text-[#606860] border border-[#DFD9CA]'
                   }`}>
-                    {pace.status === 'higher' ? 'Pacing Ahead' : pace.status === 'lower' ? 'Disciplined' : 'On Historical Track'}
+                    {pace.status === 'higher' ? 'Pacing Ahead' : pace.status === 'lower' ? 'Disciplined' : 'On Track'}
                   </span>
                 </div>
-                <p className="text-xs text-[#8e96ac] mt-0.5">
-                  Compared against cumulative spend up to Day {pace.as_of_day} in prior recorded months.
+                <p className="text-xs text-[#606860] mt-1 font-sans">
+                  Measured against cumulative spend up to Day {pace.as_of_day} in prior recorded months.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-6 font-mono text-right">
+            <div className="flex items-center gap-6 font-mono text-right border-t md:border-t-0 md:border-l border-[#EEEBDD] pt-3 md:pt-0 md:pl-6">
               <div>
-                <div className="text-[11px] text-[#8e96ac]">Current Spend</div>
-                <div className="text-base font-bold text-white">
+                <div className="text-[11px] text-[#8A928A] uppercase tracking-wider">Current Spend</div>
+                <div className="text-base font-semibold text-[#292D29]">
                   ₹{pace.current_month_spend.toLocaleString('en-IN')}
                 </div>
               </div>
               <div>
-                <div className="text-[11px] text-[#8e96ac]">Baseline Benchmark</div>
-                <div className="text-base font-bold text-zinc-400">
+                <div className="text-[11px] text-[#8A928A] uppercase tracking-wider">Benchmark</div>
+                <div className="text-base font-semibold text-[#606860]">
                   ₹{pace.historical_baseline_pace.toLocaleString('en-IN')}
                 </div>
               </div>
               <div>
-                <div className="text-[11px] text-[#8e96ac]">Pace Delta</div>
-                <div className={`text-base font-bold flex items-center justify-end gap-0.5 ${
-                  pace.diff_percentage > 0 ? 'text-amber-400' : 'text-lime-400'
+                <div className="text-[11px] text-[#8A928A] uppercase tracking-wider">Variance</div>
+                <div className={`text-base font-semibold flex items-center justify-end gap-0.5 ${
+                  pace.diff_percentage > 0 ? 'text-[#C85A32]' : 'text-[#365844]'
                 }`}>
                   {pace.diff_percentage > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                   <span>{pace.diff_percentage > 0 ? `+${pace.diff_percentage}%` : `${pace.diff_percentage}%`}</span>
@@ -130,27 +156,34 @@ export const SpendingSummary: React.FC<SpendingSummaryProps> = ({ summary }) => 
         </div>
       )}
 
-      {/* Top Merchants and Category Breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Top Merchants and Category Allocation */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Top Merchants */}
-        <div className="p-5 rounded-2xl bg-[#12141d] border border-[#242938]">
-          <div className="flex items-center gap-2 mb-4">
-            <Store className="w-4 h-4 text-lime-400" />
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider">Top Merchants by Spend</h3>
+        <div className="p-6 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
+          <div className="flex items-center justify-between mb-4 border-b border-[#EEEBDD] pb-3">
+            <div className="flex items-center gap-2">
+              <Store className="w-4 h-4 text-[#365844]" />
+              <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-[#292D29]">
+                Top Counterparties
+              </h3>
+            </div>
+            <span className="text-[11px] font-mono text-[#8A928A]">By aggregate volume</span>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             {summary.top_merchants.slice(0, 5).map((m, idx) => (
               <div key={m.merchant} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2.5">
-                  <span className="font-mono text-[11px] text-[#8e96ac] w-4">{idx + 1}.</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-[11px] text-[#8A928A] w-4">
+                    {idx + 1}.
+                  </span>
                   <div>
-                    <div className="font-medium text-white">{m.merchant}</div>
-                    <div className="text-[10px] text-[#8e96ac]">{m.category} • {m.count} purchases</div>
+                    <div className="font-medium text-[#292D29] text-sm">{m.merchant}</div>
+                    <div className="text-[11px] text-[#8A928A]">{m.category} • {m.count} payments</div>
                   </div>
                 </div>
                 <div className="text-right font-mono">
-                  <div className="font-semibold text-white">₹{m.total_amount.toLocaleString('en-IN')}</div>
-                  <div className="text-[10px] text-[#8e96ac]">avg ₹{m.avg_amount.toFixed(0)}</div>
+                  <div className="font-semibold text-[#292D29]">₹{m.total_amount.toLocaleString('en-IN')}</div>
+                  <div className="text-[10px] text-[#8A928A]">avg ₹{m.avg_amount.toFixed(0)}</div>
                 </div>
               </div>
             ))}
@@ -158,23 +191,28 @@ export const SpendingSummary: React.FC<SpendingSummaryProps> = ({ summary }) => 
         </div>
 
         {/* Category Breakdown */}
-        <div className="p-5 rounded-2xl bg-[#12141d] border border-[#242938]">
-          <div className="flex items-center gap-2 mb-4">
-            <PieChart className="w-4 h-4 text-lime-400" />
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider">Category Allocation</h3>
+        <div className="p-6 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
+          <div className="flex items-center justify-between mb-4 border-b border-[#EEEBDD] pb-3">
+            <div className="flex items-center gap-2">
+              <PieChart className="w-4 h-4 text-[#365844]" />
+              <h3 className="font-mono text-xs font-semibold uppercase tracking-wider text-[#292D29]">
+                Category Allocation
+              </h3>
+            </div>
+            <span className="text-[11px] font-mono text-[#8A928A]">Relative share</span>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             {summary.category_breakdown.slice(0, 5).map((c) => (
-              <div key={c.category} className="space-y-1 text-xs">
+              <div key={c.category} className="space-y-1.5 text-xs">
                 <div className="flex justify-between items-center">
-                  <span className="font-medium text-zinc-300">{c.category}</span>
-                  <span className="font-mono text-white font-semibold">
-                    ₹{c.total_amount.toLocaleString('en-IN')} <span className="text-[#8e96ac] font-normal">({c.percentage}%)</span>
+                  <span className="font-medium text-[#292D29]">{c.category}</span>
+                  <span className="font-mono text-[#292D29] font-medium">
+                    ₹{c.total_amount.toLocaleString('en-IN')} <span className="text-[#8A928A] font-normal">({c.percentage}%)</span>
                   </span>
                 </div>
-                <div className="h-1.5 w-full bg-[#1e2333] rounded-full overflow-hidden">
+                <div className="h-1.5 w-full bg-[#EEEBDD] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-lime-500 to-lime-300 rounded-full"
+                    className="h-full bg-[#365844] rounded-full transition-all duration-300"
                     style={{ width: `${Math.min(c.percentage, 100)}%` }}
                   />
                 </div>

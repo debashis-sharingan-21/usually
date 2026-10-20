@@ -4,7 +4,7 @@ import LenisProvider from "@/components/LenisProvider";
 
 export const metadata: Metadata = {
   title: "Usually — Your Money Has Habits",
-  description: "A polished, local-first personal finance companion that learns recurring patterns from your statement history and produces witty, evidence-backed observations.",
+  description: "A slow and steady personal finance companion. Learns your spending habits locally on your machine with paper-inspired clarity.",
 };
 
 export default function RootLayout({
@@ -13,10 +13,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="min-h-screen bg-[#07080a] text-slate-100 antialiased selection:bg-[#c6ff00] selection:text-black">
+    <html lang="en">
+      <body className="min-h-screen bg-[#F7F5EE] text-[#292D29] antialiased selection:bg-[#E8C95D]/60 selection:text-[#292D29]">
         <LenisProvider>
-          <div className="noise-overlay" />
           <div className="min-h-screen flex flex-col">{children}</div>
         </LenisProvider>
       </body>

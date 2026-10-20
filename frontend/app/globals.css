@@ -1,52 +1,104 @@
 @import "tailwindcss";
 
 :root {
-  --background: #07080a;
-  --surface: #0f1217;
-  --surface-raised: #141820;
-  --border: #1e2430;
-  --border-focus: #3b4559;
-  --foreground: #f8fafc;
-  --foreground-muted: #94a3b8;
-  --accent-lime: #c6ff00;
-  --accent-lime-dim: rgba(198, 255, 0, 0.12);
+  --bg-ivory: #F7F5EE;
+  --bg-paper: #FCFBF7;
+  --bg-cream: #EEEBDD;
+  --ink: #292D29;
+  --ink-muted: #606860;
+  --ink-faint: #8A928A;
+  --border-paper: #DFD9CA;
+  --forest: #365844;
+  --forest-dark: #243B2E;
+  --forest-light: rgba(54, 88, 68, 0.08);
+  --sage: #9CAF88;
+  --mustard-highlight: #E8C95D;
+  --terracotta: #C85A32;
+  --terracotta-light: rgba(200, 90, 50, 0.08);
 }
 
 body {
-  color: var(--foreground);
-  background-color: var(--background);
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #292D29;
+  background-color: #F7F5EE;
+  font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "DM Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Global Subtle Noise Overlay */
-.noise-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 0.025;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 0);
-  background-size: 4px 4px;
+/* Typography Utility Classes */
+.font-serif {
+  font-family: "Newsreader", "Fraunces", "Iowan Old Style", "Palatino Linotype", "Georgia", "Times New Roman", serif;
+  font-optical-sizing: auto;
 }
 
-/* Custom scrollbar */
+.font-sans {
+  font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "DM Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.font-handwriting {
+  font-family: "Caveat", "Reenie Beanie", "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+}
+
+.font-mono {
+  font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Paper & Notebook Aesthetics */
+.paper-card {
+  background-color: #FCFBF7;
+  border: 1px solid #DFD9CA;
+  box-shadow: 0 1px 3px rgba(41, 45, 41, 0.04), 0 4px 12px rgba(41, 45, 41, 0.02);
+  border-radius: 14px;
+}
+
+.paper-card-cream {
+  background-color: #EEEBDD;
+  border: 1px solid #DFD9CA;
+  border-radius: 14px;
+}
+
+.highlight-pen {
+  background-color: rgba(232, 201, 93, 0.45);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.ruled-paper-pattern {
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 27px,
+    rgba(223, 217, 202, 0.5) 28px
+  );
+  background-size: 100% 28px;
+}
+
+/* Fine hairline dividers */
+.hairline-divider {
+  height: 1px;
+  background-color: #DFD9CA;
+  border: none;
+}
+
+/* Subtle paper scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #07080a;
+  background: #F7F5EE;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e2430;
+  background: #DFD9CA;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #333d50;
+  background: #C8C0AF;
 }

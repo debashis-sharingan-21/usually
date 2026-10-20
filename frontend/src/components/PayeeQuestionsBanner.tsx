@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { PayeeQuestion } from '../types';
-import { HelpCircle, Sparkles, User, Home, Briefcase, ArrowLeftRight, ShoppingBag } from 'lucide-react';
+import { HelpCircle, User, Home, Briefcase, ArrowLeftRight, ShoppingBag, Sparkles } from 'lucide-react';
 import { answerQuestion, dismissQuestion } from '../api/client';
 
 interface PayeeQuestionsBannerProps {
@@ -13,7 +13,7 @@ export const PayeeQuestionsBanner: React.FC<PayeeQuestionsBannerProps> = ({ ques
 
   if (questions.length === 0) return null;
 
-  const currentQ = questions[0]; // Present one at a time for near-zero effort
+  const currentQ = questions[0];
 
   const handleSelectOption = async (optionId: string) => {
     setSubmittingId(currentQ.id);
@@ -42,66 +42,59 @@ export const PayeeQuestionsBanner: React.FC<PayeeQuestionsBannerProps> = ({ ques
   const getOptionIcon = (id: string) => {
     switch (id) {
       case 'friend_family':
-        return <User className="w-3.5 h-3.5 text-lime-400" />;
+        return <User className="w-3.5 h-3.5 text-[#365844]" />;
       case 'rent_household':
-        return <Home className="w-3.5 h-3.5 text-amber-400" />;
+        return <Home className="w-3.5 h-3.5 text-[#C85A32]" />;
       case 'work_business':
-        return <Briefcase className="w-3.5 h-3.5 text-cyan-400" />;
+        return <Briefcase className="w-3.5 h-3.5 text-[#606860]" />;
       case 'self_transfer':
-        return <ArrowLeftRight className="w-3.5 h-3.5 text-purple-400" />;
+        return <ArrowLeftRight className="w-3.5 h-3.5 text-[#546A7B]" />;
       case 'services_groceries':
-        return <ShoppingBag className="w-3.5 h-3.5 text-emerald-400" />;
+        return <ShoppingBag className="w-3.5 h-3.5 text-[#365844]" />;
       default:
-        return <HelpCircle className="w-3.5 h-3.5 text-zinc-400" />;
+        return <HelpCircle className="w-3.5 h-3.5 text-[#8A928A]" />;
     }
   };
 
   return (
-    <div className="p-5 rounded-2xl bg-gradient-to-r from-[#141a24] to-[#121622] border border-lime-500/30 shadow-lg shadow-lime-950/20 space-y-3 animate-in fade-in duration-200">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-lime-400/10 text-lime-400 border border-lime-400/20">
-            <Sparkles className="w-4 h-4" />
+    <div className="paper-card p-5 border-l-4 border-l-[#E8C95D] transition-all">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-widest font-mono text-[#8A928A] font-semibold">
+              Notebook Note • {questions.length} question{questions.length > 1 ? 's' : ''} left
+            </span>
+            <span className="font-handwriting text-sm text-[#365844]">
+              ~ teach usually once, remembered forever
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-wider font-bold text-lime-400">
-                One-Tap Clarification ({questions.length} pending)
-              </span>
-            </div>
-            <h3 className="text-sm font-bold text-white mt-0.5">
-              {currentQ.prompt}
-            </h3>
-          </div>
+          <h3 className="font-serif text-lg text-[#292D29] font-medium leading-snug">
+            {currentQ.prompt}
+          </h3>
         </div>
 
         <button
           onClick={handleDismiss}
           disabled={submittingId === currentQ.id}
-          className="text-xs text-[#8e96ac] hover:text-zinc-300 px-2 py-1 rounded hover:bg-[#1a1e2b] transition-colors cursor-pointer"
+          className="text-xs text-[#8A928A] hover:text-[#292D29] px-2 py-1 rounded transition-colors cursor-pointer self-start"
           title="Skip question for now"
         >
-          Skip
+          Skip for now
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 pt-1">
+      <div className="flex flex-wrap items-center gap-2 pt-3">
         {currentQ.options.map((opt) => (
           <button
             key={opt.id}
             onClick={() => handleSelectOption(opt.id)}
             disabled={submittingId === currentQ.id}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#161a26] hover:bg-[#1f2536] border border-[#262c3f] hover:border-lime-400/40 text-xs font-medium text-white transition-all cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0"
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#EEEBDD] hover:bg-[#E2DECE] border border-[#DFD9CA] text-xs font-medium text-[#292D29] transition-all cursor-pointer shadow-sm hover:shadow active:scale-95"
           >
             {getOptionIcon(opt.id)}
             <span>{opt.label}</span>
           </button>
         ))}
-      </div>
-
-      <div className="text-[10px] text-[#8e96ac] flex items-center justify-between pt-1">
-        <span>Usually remembers your choice and applies it across past and future imports.</span>
-        <span className="font-mono text-zinc-500">Payee: {currentQ.payee_name}</span>
       </div>
     </div>
   );
