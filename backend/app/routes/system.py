@@ -1,4 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from app.config import is_public_demo, get_deployment_mode
+from app.guards import verify_write_permission
 from app.database import get_connection, get_active_context, set_active_context
 from app.services.accounting import calculate_spending_summary
 from app.services.ai_generator import check_ollama_status
@@ -41,16 +43,17 @@ def get_health():
 
         ollama_ok, model_name = check_ollama_status()
 
-        # Check if personal data exists
+        # Check if personal data exists (strictly forbidden and bypassed in public demo mode)
         has_personal = False
-        try:
-            p_conn = get_connection("personal")
-            p_cur = p_conn.cursor()
-            p_cur.execute("SELECT COUNT(*) FROM transactions")
-            has_personal = p_cur.fetchone()[0] > 0
-            p_conn.close()
-        except Exception:
-            pass
+        if not is_public_demo():
+            try:
+                p_conn = get_connection("personal")
+                p_cur = p_conn.cursor()
+                p_cur.execute("SELECT COUNT(*) FROM transactions")
+                has_personal = p_cur.fetchone()[0] > 0
+                p_conn.close()
+            except Exception:
+                pass
 
         return SystemHealthResponse(
             status="healthy",
@@ -63,7 +66,8 @@ def get_health():
             pending_questions_count=pending_q,
             current_tone=tone_val,
             active_context=active_ctx,
-            has_personal_data=has_personal
+            has_personal_data=has_personal,
+            deployment_mode=get_deployment_mode()
         )
     finally:
         conn.close()
@@ -72,7 +76,7 @@ def get_health():
 def get_context():
     return {"active_context": get_active_context()}
 
-@router.post("/system/context")
+@router.post("/system/context", dependencies=[Depends(verify_write_permission)])
 def switch_context(payload: dict):
     target_context = payload.get("context", "personal")
     if target_context not in ("personal", "demo"):
@@ -80,7 +84,7 @@ def switch_context(payload: dict):
     set_active_context(target_context)
     return {"status": "success", "active_context": target_context}
 
-@router.put("/system/tone")
+@router.put("/system/tone", dependencies=[Depends(verify_write_permission)])
 def update_tone(payload: UserSettingsUpdate):
     if payload.tone not in ("playful", "dry", "minimal"):
         raise HTTPException(status_code=400, detail="Tone must be 'playful', 'dry', or 'minimal'")
@@ -97,7 +101,7 @@ def update_tone(payload: UserSettingsUpdate):
     finally:
         conn.close()
 
-@router.post("/system/seed-demo")
+@router.post("/system/seed-demo", dependencies=[Depends(verify_write_permission)])
 def seed_demo_data():
     conn = get_connection("demo")
     try:
@@ -107,7 +111,7 @@ def seed_demo_data():
     finally:
         conn.close()
 
-@router.post("/system/clear-data")
+@router.post("/system/clear-data", dependencies=[Depends(verify_write_permission)])
 def clear_all_data():
     active_ctx = get_active_context()
     conn = get_connection(active_ctx)

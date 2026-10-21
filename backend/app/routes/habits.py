@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from datetime import datetime
 from app.database import get_connection
+from app.guards import verify_write_permission
 from app.services.habit_engine import detect_habits
 from app.models.schema import HabitObservation, HabitFeedbackRequest
 from app.services.ai_generator import generate_observation_with_ai
@@ -37,7 +38,7 @@ def get_habits(reference_date: Optional[str] = None):
     finally:
         conn.close()
 
-@router.post("/feedback")
+@router.post("/feedback", dependencies=[Depends(verify_write_permission)])
 def update_habit_feedback(payload: HabitFeedbackRequest):
     if payload.status not in ("confirmed", "muted", "active"):
         raise HTTPException(status_code=400, detail="Status must be 'confirmed', 'muted', or 'active'")

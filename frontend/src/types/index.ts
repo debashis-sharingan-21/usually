@@ -166,4 +166,5 @@ export interface SystemHealthResponse {
   current_tone: 'playful' | 'dry' | 'minimal';
   active_context?: 'personal' | 'demo';
   has_personal_data?: boolean;
+  deployment_mode?: string;
 }

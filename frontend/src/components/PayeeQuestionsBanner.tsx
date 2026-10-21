@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { PayeeQuestion } from '../types';
 import { HelpCircle, User, Home, Briefcase, ArrowLeftRight, ShoppingBag, Sparkles } from 'lucide-react';
 import { answerQuestion, dismissQuestion } from '../api/client';
+import { isPublicDemoUI } from '@/lib/demo';
 
 interface PayeeQuestionsBannerProps {
   questions: PayeeQuestion[];
@@ -11,7 +12,7 @@ interface PayeeQuestionsBannerProps {
 export const PayeeQuestionsBanner: React.FC<PayeeQuestionsBannerProps> = ({ questions, onAnswered }) => {
   const [submittingId, setSubmittingId] = useState<string | null>(null);
 
-  if (questions.length === 0) return null;
+  if (questions.length === 0 || isPublicDemoUI()) return null;
 
   const currentQ = questions[0];
 

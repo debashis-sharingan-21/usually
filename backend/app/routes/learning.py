@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any
 from app.database import get_connection
+from app.guards import verify_write_permission
 from app.services.learning_engine import (
     get_pending_questions,
     answer_payee_question,
@@ -19,7 +20,7 @@ def fetch_questions():
     finally:
         conn.close()
 
-@router.post("/answer")
+@router.post("/answer", dependencies=[Depends(verify_write_permission)])
 def submit_answer(payload: PayeeAnswerRequest):
     conn = get_connection()
     try:
@@ -37,7 +38,7 @@ def submit_answer(payload: PayeeAnswerRequest):
     finally:
         conn.close()
 
-@router.post("/dismiss/{question_id}")
+@router.post("/dismiss/{question_id}", dependencies=[Depends(verify_write_permission)])
 def dismiss_question(question_id: str):
     conn = get_connection()
     try:

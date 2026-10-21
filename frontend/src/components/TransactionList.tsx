@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import type { Transaction } from '../types';
 import { fetchTransactions, updateTransaction } from '../api/client';
 import { Search, Edit2, Check, X, Tag, ArrowLeft, ArrowRight } from 'lucide-react';
+import { useStatement } from '@/context/StatementContext';
+import { isPublicDemoUI } from '@/lib/demo';
 
 interface TransactionListProps {
   onTransactionUpdated: () => void;
@@ -21,6 +23,9 @@ const CATEGORIES = [
 ];
 
 export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionUpdated }) => {
+  const { health } = useStatement();
+  const isPublicDemo = isPublicDemoUI(health?.is_demo_mode, health?.deployment_mode);
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -270,7 +275,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
                                 <X className="w-3.5 h-3.5" />
                               </button>
                             </div>
-                          ) : (
+                          ) : !isPublicDemo ? (
                             <button
                               onClick={() => startEdit(t)}
                               className="p-1.5 text-[#8A928A] hover:text-[#292D29] rounded-lg hover:bg-[#EEEBDD] transition-colors btn-tactile cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
@@ -278,7 +283,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                          )}
+                          ) : null}
                         </td>
                       </tr>
                     );

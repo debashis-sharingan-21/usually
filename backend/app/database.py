@@ -1,7 +1,7 @@
 import sqlite3
 import os
 from typing import Optional
-from app.config import DATA_DIR
+from app.config import DATA_DIR, is_public_demo, get_demo_db_path, get_personal_db_path
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS import_batches (
@@ -84,20 +84,19 @@ CREATE INDEX IF NOT EXISTS idx_questions_status ON payee_questions(status);
 _ACTIVE_CONTEXT: Optional[str] = None
 
 def get_db_path(context: str = "personal") -> str:
-    custom_personal = os.environ.get("USUALLY_DB_PATH")
+    # In public demo mode, all access is strictly pinned to the synthetic demo database.
+    # A personal database path is never returned under any circumstance.
+    if is_public_demo():
+        return get_demo_db_path()
     if context == "demo":
-        custom_demo = os.environ.get("USUALLY_DEMO_DB_PATH")
-        if custom_demo:
-            return custom_demo
-        if custom_personal:
-            if custom_personal.endswith(".db"):
-                return custom_personal[:-3] + "_demo.db"
-            return custom_personal + "_demo"
-        return str(DATA_DIR / "usually_demo.db")
-    return custom_personal if custom_personal else str(DATA_DIR / "usually.db")
+        return get_demo_db_path()
+    return get_personal_db_path()
 
 def get_active_context() -> str:
     global _ACTIVE_CONTEXT
+    # Public demo mode is immutably pinned to 'demo' context
+    if is_public_demo():
+        return "demo"
     if _ACTIVE_CONTEXT is not None:
         return _ACTIVE_CONTEXT
     _ACTIVE_CONTEXT = "personal"
@@ -117,6 +116,12 @@ def get_active_context() -> str:
 
 def set_active_context(context: str):
     global _ACTIVE_CONTEXT
+    if is_public_demo():
+        if context != "demo":
+            raise ValueError("Context switching to 'personal' is strictly forbidden in public demo mode.")
+        _ACTIVE_CONTEXT = "demo"
+        return
+
     if context not in ("personal", "demo"):
         raise ValueError(f"Invalid context '{context}', must be 'personal' or 'demo'")
     _ACTIVE_CONTEXT = context
@@ -137,8 +142,12 @@ def set_active_context(context: str):
         pass
 
 def get_connection(context: Optional[str] = None) -> sqlite3.Connection:
-    ctx = context if context is not None else get_active_context()
+    if is_public_demo():
+        ctx = "demo"
+    else:
+        ctx = context if context is not None else get_active_context()
     path = get_db_path(ctx)
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL")
@@ -238,11 +247,27 @@ def migrate_db(conn: sqlite3.Connection):
     heal_and_reconcile_transactions(conn)
 
 def init_db(context: Optional[str] = None):
-    contexts = [context] if context else ["personal", "demo"]
+    # Public demo mode is strictly restricted to initializing the demo database.
+    if is_public_demo():
+        contexts = ["demo"]
+    else:
+        contexts = [context] if context else ["personal", "demo"]
+
     for ctx in contexts:
         path = get_db_path(ctx)
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
         conn = sqlite3.connect(path)
         with conn:
             conn.executescript(SCHEMA_SQL)
         migrate_db(conn)
+
+        # Idempotent synthetic seeding for demo database in public demo mode
+        if is_public_demo() and ctx == "demo":
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM transactions")
+            count = cur.fetchone()[0]
+            if count == 0:
+                from app.services.demo_data import load_realistic_demo_dataset
+                load_realistic_demo_dataset(conn)
+
         conn.close()

@@ -161,3 +161,4 @@ class SystemHealthResponse(BaseModel):
     current_tone: str = "playful"
     active_context: str = "personal"
     has_personal_data: bool = False
+    deployment_mode: str = "local"

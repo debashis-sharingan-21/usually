@@ -12,11 +12,14 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
-  FolderOpen
+  FolderOpen,
+  ShieldCheck
 } from 'lucide-react';
 import { previewCSV, importCSV } from '../api/client';
 import type { CSVPreviewResponse, CSVImportResult } from '../types';
 import { SlothMascot } from './SlothMascot';
+import { useStatement } from '@/context/StatementContext';
+import { isPublicDemoUI } from '@/lib/demo';
 
 export type SelectionStatus =
   | 'idle'
@@ -50,6 +53,9 @@ const formatFileSize = (bytes: number): string => {
 };
 
 export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose, onImportSuccess }) => {
+  const { health } = useStatement();
+  const isPublicDemo = isPublicDemoUI(health?.is_demo_mode, health?.deployment_mode);
+
   const [selection, setSelection] = useState<AuthoritativeSelection | null>(null);
   const activeSelectionRef = useRef<AuthoritativeSelection | null>(null);
 
@@ -387,7 +393,40 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
 
         {/* Content Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 min-h-0 text-sm bg-[#FCFBF7]">
-          {/* STATE 1: SUCCESS RESULT */}
+          {isPublicDemo ? (
+            <div className="space-y-6 py-6 text-center animate-fade-in max-w-xl mx-auto">
+              <div className="flex justify-center mb-1">
+                <div className="p-4 rounded-2xl bg-[#EEEBDD] border border-[#DFD9CA]">
+                  <SlothMascot mood="peaceful" size={64} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-[#365844] font-semibold">
+                  Public Showcase • Read-Only
+                </span>
+                <h3 className="font-serif text-2xl font-normal text-[#292D29]">
+                  Synthetic Data Demonstration
+                </h3>
+                <p className="text-xs text-[#606860] leading-relaxed font-sans">
+                  This hosted deployment is a read-only demonstration running against a synthetic 6-month transaction dataset.
+                  Statement uploads, parsing, and ledger modifications are disabled on this public server to ensure data isolation.
+                </p>
+              </div>
+
+              <div className="p-4 bg-[#F7F5EE] rounded-xl border border-[#DFD9CA] text-xs text-left space-y-2">
+                <div className="font-mono text-[11px] uppercase tracking-wider text-[#365844] font-medium flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-[#365844]" />
+                  <span>Analyze Your Statements Privately with Local SQLite</span>
+                </div>
+                <p className="text-[11px] text-[#606860] leading-relaxed">
+                  Usually is built as a local-first application. When you clone and run Usually on your personal computer,
+                  all parsing, SQLite storage, and habit analysis stay 100% on your machine—no transaction data is ever sent to a server.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* STATE 1: SUCCESS RESULT */}
           {currentStatus === 'success' && importResult && selection && (
             <div className="space-y-5 py-4 text-center animate-fade-in">
               <div className="flex justify-center mb-1">
@@ -826,11 +865,26 @@ export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose,
               </div>
             </div>
           )}
-        </div>
+        </>
+      )}
+    </div>
 
-        {/* Persistent Action Footer */}
-        <div className="shrink-0 px-5 sm:px-6 py-3.5 sm:py-4 border-t border-[#DFD9CA] bg-[#F7F5EE] flex flex-col sm:flex-row items-center justify-between gap-3">
-          {currentStatus === 'success' ? (
+    {/* Persistent Action Footer */}
+    <div className="shrink-0 px-5 sm:px-6 py-3.5 sm:py-4 border-t border-[#DFD9CA] bg-[#F7F5EE] flex flex-col sm:flex-row items-center justify-between gap-3">
+      {isPublicDemo ? (
+        <>
+          <div className="text-xs text-[#606860] font-mono flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#E8C95D]" />
+            <span>Public demo locked to synthetic dataset</span>
+          </div>
+          <button
+            onClick={handleClose}
+            className="w-full sm:w-auto px-5 py-2 rounded-xl bg-[#365844] hover:bg-[#2c4737] text-white font-medium text-xs shadow-sm transition-all btn-tactile cursor-pointer"
+          >
+            Explore Synthetic Ledger
+          </button>
+        </>
+      ) : currentStatus === 'success' ? (
             <>
               <div className="text-xs text-[#365844] font-mono flex items-center gap-2 self-start sm:self-auto">
                 <CheckCircle2 className="w-4 h-4 text-[#365844] shrink-0" />

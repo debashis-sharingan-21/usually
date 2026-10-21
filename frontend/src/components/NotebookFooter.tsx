@@ -6,9 +6,11 @@ import { useStatement } from '@/context/StatementContext';
 import { ShieldCheck, UploadCloud, Heart } from 'lucide-react';
 import gsap from 'gsap';
 import { isReducedMotion, observeViewportReveal } from '@/lib/motion';
+import { isPublicDemoUI } from '@/lib/demo';
 
 export const NotebookFooter: React.FC = () => {
-  const { setIsImportOpen } = useStatement();
+  const { setIsImportOpen, health } = useStatement();
+  const isPublicDemo = isPublicDemoUI(health?.is_demo_mode, health?.deployment_mode);
   const [isHovered, setIsHovered] = useState(false);
   const footerRef = useRef<HTMLElement>(null);
   const hasAnimatedRef = useRef(false);
@@ -286,7 +288,7 @@ export const NotebookFooter: React.FC = () => {
                     className="text-[#365844] hover:text-[#243B2E] hover:underline underline-offset-4 decoration-[#DFD9CA] cursor-pointer inline-flex items-center gap-1 transition-colors btn-tactile focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844] rounded-sm"
                   >
                     <UploadCloud className="w-3 h-3" />
-                    <span>Import Statement</span>
+                    <span>{isPublicDemo ? 'Demo Intake Info' : 'Import Statement'}</span>
                   </button>
                 </li>
               </ul>
@@ -296,11 +298,12 @@ export const NotebookFooter: React.FC = () => {
             <div className="footer-column-item space-y-2 max-w-xs text-center sm:text-left bg-[#FCFBF7] p-3.5 rounded-xl border border-[#DFD9CA] shadow-2xs hover:border-[#BFB9AA] transition-colors">
               <div className="flex items-center justify-center sm:justify-start gap-1.5 font-mono text-[11px] text-[#365844] font-medium">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#365844]" />
-                <span>Local SQLite Security</span>
+                <span>{isPublicDemo ? 'Public Demo (Synthetic)' : 'Local SQLite Security'}</span>
               </div>
               <p className="text-[11px] text-[#8A928A] leading-relaxed font-sans">
-                Your bank statements and personal transactions never leave this machine.
-                All parsing, accounting, and habit memory run strictly on local hardware.
+                {isPublicDemo
+                  ? 'This hosted showcase serves read-only synthetic transactions. For private personal finance analysis with SQLite privacy, run Usually locally.'
+                  : 'Your bank statements and personal transactions never leave this machine. All parsing, accounting, and habit memory run strictly on local hardware.'}
               </p>
             </div>
           </div>

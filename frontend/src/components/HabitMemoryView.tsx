@@ -3,6 +3,8 @@ import type { HabitObservation } from '../types';
 import { Brain, Clock, Calendar, Check, VolumeX, Sparkles } from 'lucide-react';
 import { sendHabitFeedback } from '../api/client';
 import { SlothMascot } from './SlothMascot';
+import { useStatement } from '@/context/StatementContext';
+import { isPublicDemoUI } from '@/lib/demo';
 
 interface HabitMemoryViewProps {
   habits: HabitObservation[];
@@ -10,7 +12,11 @@ interface HabitMemoryViewProps {
 }
 
 export const HabitMemoryView: React.FC<HabitMemoryViewProps> = ({ habits, onRefresh }) => {
+  const { health } = useStatement();
+  const isPublicDemo = isPublicDemoUI(health?.is_demo_mode, health?.deployment_mode);
+
   const handleFeedback = async (key: string, status: 'confirmed' | 'muted' | 'active') => {
+    if (isPublicDemo) return;
     try {
       await sendHabitFeedback(key, status);
       onRefresh();
@@ -120,35 +126,41 @@ export const HabitMemoryView: React.FC<HabitMemoryViewProps> = ({ habits, onRefr
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2 font-medium">
-                  {isMuted ? (
-                    <button
-                      onClick={() => handleFeedback(h.habit_key, 'active')}
-                      className="text-[#365844] hover:underline cursor-pointer"
-                    >
-                      Unmute
-                    </button>
-                  ) : (
-                    <>
-                      {!isConfirmed && (
-                        <button
-                          onClick={() => handleFeedback(h.habit_key, 'confirmed')}
-                          className="flex items-center gap-1 text-[#292D29] hover:text-[#365844] cursor-pointer"
-                        >
-                          <Check className="w-3 h-3 text-[#365844]" />
-                          <span>Confirm</span>
-                        </button>
-                      )}
+                {!isPublicDemo ? (
+                  <div className="flex items-center gap-2 font-medium">
+                    {isMuted ? (
                       <button
-                        onClick={() => handleFeedback(h.habit_key, 'muted')}
-                        className="flex items-center gap-1 text-[#8A928A] hover:text-[#C85A32] cursor-pointer"
+                        onClick={() => handleFeedback(h.habit_key, 'active')}
+                        className="text-[#365844] hover:underline cursor-pointer"
                       >
-                        <VolumeX className="w-3 h-3" />
-                        <span>Mute</span>
+                        Unmute
                       </button>
-                    </>
-                  )}
-                </div>
+                    ) : (
+                      <>
+                        {!isConfirmed && (
+                          <button
+                            onClick={() => handleFeedback(h.habit_key, 'confirmed')}
+                            className="flex items-center gap-1 text-[#292D29] hover:text-[#365844] cursor-pointer"
+                          >
+                            <Check className="w-3 h-3 text-[#365844]" />
+                            <span>Confirm</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleFeedback(h.habit_key, 'muted')}
+                          className="flex items-center gap-1 text-[#8A928A] hover:text-[#C85A32] cursor-pointer"
+                        >
+                          <VolumeX className="w-3 h-3" />
+                          <span>Mute</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-[10px] font-mono text-[#8A928A]">
+                    Synthetic Observation
+                  </span>
+                )}
               </div>
             </div>
           );

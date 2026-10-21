@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { SlothMascot } from './SlothMascot';
+import { isPublicDemoUI } from '@/lib/demo';
 import {
   UploadCloud,
   SlidersHorizontal,
@@ -46,6 +47,7 @@ export const Navbar: React.FC = () => {
     }
   }, [isDiagnosticOpen]);
 
+  const isPublicDemo = isPublicDemoUI(health?.is_demo_mode, health?.deployment_mode);
   const isDemo = health?.is_demo_mode ?? false;
   const currentTone = health?.current_tone ?? 'playful';
 
@@ -57,6 +59,18 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
+      {/* Public Demo Notification Banner */}
+      {isPublicDemo && (
+        <div className="bg-[#F7F5EE] border-b border-[#DFD9CA] px-4 py-1.5 text-center text-xs text-[#606860] flex flex-wrap items-center justify-center gap-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#E8C95D]" />
+          <span className="font-medium text-[#292D29]">Public Demo (Synthetic Data)</span>
+          <span className="text-[#8A928A] hidden sm:inline">•</span>
+          <span className="text-[#606860]">
+            Statement imports and edits are disabled in this hosted showcase. To analyze your personal finances with SQLite privacy, run Usually locally.
+          </span>
+        </div>
+      )}
+
       <header className="sticky top-0 z-40 bg-[#FCFBF7]/95 backdrop-blur-md border-b border-[#DFD9CA] transition-all">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-15 flex items-center justify-between">
           
@@ -99,17 +113,29 @@ export const Navbar: React.FC = () => {
 
           {/* Right: Context Switcher, Import Action & Diagnostics Button */}
           <div className="flex items-center gap-2.5">
-            {/* Restrained Context Switcher */}
-            <button
-              onClick={() => handleSwitchContext(isDemo ? 'personal' : 'demo')}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-[#F7F5EE] hover:bg-[#EEEBDD] border border-[#DFD9CA] text-[#606860] hover:text-[#292D29] flex items-center gap-1.5 transition-all btn-tactile cursor-pointer"
-              title={isDemo ? 'Switching to Personal data partition' : 'Switching to 6-month Demo dataset'}
-            >
-              <span className={`w-2 h-2 rounded-full ${isDemo ? 'bg-[#E8C95D]' : 'bg-[#365844]'}`} />
-              <span className="font-mono text-[11px] font-medium">
-                {isDemo ? 'Demo Mode' : 'Personal Data'}
-              </span>
-            </button>
+            {/* Context Indicator or Switcher */}
+            {isPublicDemo ? (
+              <div
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-[#F7F5EE] border border-[#DFD9CA] text-[#606860] flex items-center gap-1.5 select-none cursor-default"
+                title="Public Demo Mode: Locked to 6-month synthetic dataset"
+              >
+                <span className="w-2 h-2 rounded-full bg-[#E8C95D]" />
+                <span className="font-mono text-[11px] font-medium text-[#292D29]">
+                  Synthetic Demo
+                </span>
+              </div>
+            ) : (
+              <button
+                onClick={() => handleSwitchContext(isDemo ? 'personal' : 'demo')}
+                className="text-xs px-2.5 py-1.5 rounded-lg bg-[#F7F5EE] hover:bg-[#EEEBDD] border border-[#DFD9CA] text-[#606860] hover:text-[#292D29] flex items-center gap-1.5 transition-all btn-tactile cursor-pointer"
+                title={isDemo ? 'Switching to Personal data partition' : 'Switching to 6-month Demo dataset'}
+              >
+                <span className={`w-2 h-2 rounded-full ${isDemo ? 'bg-[#E8C95D]' : 'bg-[#365844]'}`} />
+                <span className="font-mono text-[11px] font-medium">
+                  {isDemo ? 'Demo Mode' : 'Personal Data'}
+                </span>
+              </button>
+            )}
 
             {/* Import Statement Action */}
             <button
@@ -117,7 +143,7 @@ export const Navbar: React.FC = () => {
               className="hidden sm:flex items-center gap-1.5 text-xs px-3.5 py-1.5 rounded-lg bg-[#365844] hover:bg-[#2c4737] text-white font-medium shadow-2xs transition-all btn-tactile cursor-pointer"
             >
               <UploadCloud className="w-3.5 h-3.5" />
-              <span>Import Statement</span>
+              <span>{isPublicDemo ? 'Demo Info' : 'Import Statement'}</span>
             </button>
 
             {/* Diagnostics & Settings trigger */}
@@ -194,28 +220,32 @@ export const Navbar: React.FC = () => {
                         <span>Storage:</span>
                       </span>
                       <span className="font-mono text-[11px] text-[#292D29]">
-                        SQLite Local ({health?.transaction_count || 0} rows)
+                        {isPublicDemo ? 'Hosted SQLite (Demo Dataset)' : `SQLite Local (${health?.transaction_count || 0} rows)`}
                       </span>
                     </div>
 
                     <div className="text-[10px] text-[#8A928A] pt-1 border-t border-[#DFD9CA]/50 font-sans">
-                      100% local-first. Raw statements and fingerprints never leave this device.
+                      {isPublicDemo
+                        ? 'Public showcase with synthetic transactions. To analyze personal bank statements privately, run Usually locally.'
+                        : '100% local-first. Raw statements and fingerprints never leave this device.'}
                     </div>
                   </div>
 
-                  {/* Reset/Clear Action */}
-                  <div className="pt-1">
-                    <button
-                      onClick={() => {
-                        setIsDiagnosticOpen(false);
-                        handleClearData();
-                      }}
-                      className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer text-xs font-medium"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Clear Local Data</span>
-                    </button>
-                  </div>
+                  {/* Reset/Clear Action (Local only) */}
+                  {!isPublicDemo && (
+                    <div className="pt-1">
+                      <button
+                        onClick={() => {
+                          setIsDiagnosticOpen(false);
+                          handleClearData();
+                        }}
+                        className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer text-xs font-medium"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Clear Local Data</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -253,10 +283,10 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => setIsImportOpen(true)}
           className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[11px] font-medium text-[#365844] hover:text-[#2c4737] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
-          title="Import Statement"
+          title={isPublicDemo ? 'Demo Info' : 'Import Statement'}
         >
           <UploadCloud className="w-5 h-5" />
-          <span>Import</span>
+          <span>{isPublicDemo ? 'Demo' : 'Import'}</span>
         </button>
       </nav>
     </>

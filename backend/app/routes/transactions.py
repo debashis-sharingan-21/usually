@@ -1,14 +1,15 @@
 import uuid
 from typing import Optional, List
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Depends
 from app.database import get_connection, set_active_context
+from app.guards import verify_write_permission
 from app.services.csv_importer import parse_and_preview_csv, execute_import
 from app.models.schema import CSVPreviewResponse, CSVImportResult, TransactionUpdate
 import json
 
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
-@router.post("/preview", response_model=CSVPreviewResponse)
+@router.post("/preview", response_model=CSVPreviewResponse, dependencies=[Depends(verify_write_permission)])
 async def preview_csv(
     file: UploadFile = File(...),
     mapping: Optional[str] = Form(None)
@@ -34,7 +35,7 @@ async def preview_csv(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to parse CSV statement: {str(e)}")
 
-@router.post("/import", response_model=CSVImportResult)
+@router.post("/import", response_model=CSVImportResult, dependencies=[Depends(verify_write_permission)])
 async def import_csv(
     file: UploadFile = File(...),
     mapping: str = Form(...),
@@ -134,7 +135,7 @@ def list_transactions(
     finally:
         conn.close()
 
-@router.put("/{tx_id}")
+@router.put("/{tx_id}", dependencies=[Depends(verify_write_permission)])
 def update_transaction(tx_id: int, payload: TransactionUpdate):
     conn = get_connection()
     try:
@@ -171,7 +172,7 @@ def update_transaction(tx_id: int, payload: TransactionUpdate):
     finally:
         conn.close()
 
-@router.delete("")
+@router.delete("", dependencies=[Depends(verify_write_permission)])
 def delete_all_transactions():
     """Privacy control: permanently removes all imported transactions and batches from local machine."""
     active_ctx = get_active_context()

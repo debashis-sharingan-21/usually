@@ -7,6 +7,7 @@ import { selectBriefingAndNotifications } from '@/lib/briefing';
 import { SlothMascot } from '@/components/SlothMascot';
 import { PayeeQuestionsBanner } from '@/components/PayeeQuestionsBanner';
 import { sendHabitFeedback } from '@/api/client';
+import { isPublicDemoUI } from '@/lib/demo';
 import gsap from 'gsap';
 import { useGsapContext } from '@/lib/motion';
 import {
@@ -45,6 +46,7 @@ export default function HomePage() {
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const homeRef = useRef<HTMLDivElement>(null);
 
+  const isPublicDemo = isPublicDemoUI(health?.is_demo_mode, health?.deployment_mode);
   const hasData = (health?.transaction_count || 0) > 0;
   const briefing = selectBriefingAndNotifications(notifications, summary);
   const featured = briefing.featuredObservation;
@@ -332,30 +334,36 @@ export default function HomePage() {
                   {expandedEvidence ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                 </button>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleFeedback(featured.habit_key, 'confirmed')}
-                    disabled={feedbackLoading || featured.status === 'confirmed'}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all btn-tactile cursor-pointer ${
-                      featured.status === 'confirmed'
-                        ? 'bg-[#365844] text-white border border-[#365844]'
-                        : 'text-[#292D29] bg-[#FCFBF7] hover:bg-[#EEEBDD] border border-[#DFD9CA]'
-                    }`}
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>{featured.status === 'confirmed' ? 'Verified' : 'Confirm'}</span>
-                  </button>
+                {!isPublicDemo ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleFeedback(featured.habit_key, 'confirmed')}
+                      disabled={feedbackLoading || featured.status === 'confirmed'}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all btn-tactile cursor-pointer ${
+                        featured.status === 'confirmed'
+                          ? 'bg-[#365844] text-white border border-[#365844]'
+                          : 'text-[#292D29] bg-[#FCFBF7] hover:bg-[#EEEBDD] border border-[#DFD9CA]'
+                      }`}
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>{featured.status === 'confirmed' ? 'Verified' : 'Confirm'}</span>
+                    </button>
 
-                  <button
-                    onClick={() => handleFeedback(featured.habit_key, 'muted')}
-                    disabled={feedbackLoading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#8A928A] hover:text-[#C85A32] bg-[#FCFBF7] hover:bg-[#C85A32]/10 border border-[#DFD9CA] transition-all btn-tactile cursor-pointer"
-                    title="Mute this topic"
-                  >
-                    <VolumeX className="w-3.5 h-3.5" />
-                    <span>Mute</span>
-                  </button>
-                </div>
+                    <button
+                      onClick={() => handleFeedback(featured.habit_key, 'muted')}
+                      disabled={feedbackLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#8A928A] hover:text-[#C85A32] bg-[#FCFBF7] hover:bg-[#C85A32]/10 border border-[#DFD9CA] transition-all btn-tactile cursor-pointer"
+                      title="Mute this topic"
+                    >
+                      <VolumeX className="w-3.5 h-3.5" />
+                      <span>Mute</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-[11px] font-mono text-[#8A928A] bg-[#F7F5EE] px-2.5 py-1 rounded-md border border-[#DFD9CA]">
+                    Public Demo • Read-only
+                  </div>
+                )}
               </div>
 
               {/* Expandable Supporting Evidence Drawer */}

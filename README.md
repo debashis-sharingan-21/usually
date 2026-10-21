@@ -1,215 +1,150 @@
 # Usually — Your Money Has Habits
 
-> A polished, local-first, open-source AI personal finance companion for **Hacktoberfest 2026 Week 3**, themed **“Slow and Steady.”**
+> A quiet, local-first personal finance AI companion designed with a warm, editorial notebook aesthetic.
+> Themed **“Slow and Steady”** with a peaceful sloth identity.
 
-Usually is **not** a generic expense tracker or a chatbot that offers financial advice. It learns recurring patterns from a user's transaction history and produces short, witty, personalized observations grounded strictly in verified evidence.
-
----
-
-## Intended Voice & Examples
-
-- *“Wednesday again. You've ordered from Swiggy on 4 of your last 5 Wednesdays. No order yet today. Cooking tonight, buddy?”*
-- *“Amazon has appeared in 5 of your last 6 months. A quiet month so far. Are we healing, or is Prime Day still loading?”*
-- *“Your restaurant spending is 42% higher than your usual pace this month. Something worth celebrating?”*
-
-> **Critical Rule:** Usually never displays an observation unless the imported data strictly supports it. Financial numbers are never hallucinated, invented, or calculated by AI.
+Usually is **not** a generic expense tracker or a conversational budgeting bot. It observes verified recurring rhythms in your transaction ledger (e.g., dining surges, commute patterns, subscription cadences) and turns them into concise, evidence-backed observations at your own pace.
 
 ---
 
-## Architectural Principles & Privacy Guarantee
+## Two Ways to Experience Usually
 
-- **Local-first Persistence:** Stored locally in a local SQLite database (`backend/data/usually.db`).
-- **Zero Cloud Transmit:** Raw CSV statements, parsed rows, and SHA-256 fingerprints never leave your machine.
-- **Deterministic Accounting:** Income, expenses, category allocations, and monthly pacing benchmarks are calculated in tested Python code. Transfers (e.g., credit card bill payoffs, self-account transfers) are identified and excluded so they do not falsely inflate consumption spending.
-- **Defensible Fingerprinting:** Prevents duplicate statement re-imports while preserving legitimate repeated purchases on the same day.
-- **Local Open-Weight AI (Ollama + Gemma):**
-  - If a local Ollama instance running `gemma2:2b` is active, it receives only minimal verified facts to produce a witty headline and message.
-  - A claim validator checks generated text against evidence. If any number or date is not in the evidence, or if Ollama is offline, Usually falls back to tested deterministic templates with zero downtime.
+Usually is designed with a strict distinction between **Local Private Use** and the **Public Hosted Demo**:
 
----
+| Feature / Capability | Local Development (Private Use) | Public Hosted Demo (Railway + Vercel) |
+| :--- | :--- | :--- |
+| **Data Source** | Personal bank & UPI CSV statements | Synthetic 6-month demonstration dataset |
+| **Database Storage** | Local SQLite (`backend/data/usually.db`) | Persistent demo volume (`/data/usually_demo.db`) |
+| **Privacy Isolation** | 100% on your machine (zero data leaves device) | Multi-layered server guard; personal DB prohibited |
+| **CSV Import & Mapping** | Enabled (PhonePe, HDFC, SBI, generic CSVs) | Disabled (HTTP 403 Forbidden on server) |
+| **Transaction Editing** | Enabled (change merchant, category, type) | Disabled (HTTP 403 Forbidden on server) |
+| **Habit Feedback** | Enabled (Confirm, Mute, Persistent learning) | Disabled (Read-only showcase) |
+| **AI Engine** | Local Ollama + Gemma 2b or deterministic rules | Offline deterministic fallback engine |
 
-## Project Structure
-
-```
-usually/
-├── backend/
-│   ├── app/
-│   │   ├── config.py              # Configuration & settings
-│   │   ├── database.py            # SQLite connection with WAL mode
-│   │   ├── main.py                # FastAPI app entrypoint
-│   │   ├── models/
-│   │   │   └── schema.py          # Pydantic data schemas
-│   │   ├── routes/
-│   │   │   ├── transactions.py    # CSV preview, mapping, commit, edit, delete
-│   │   │   ├── habits.py          # Discovered habit memory & user feedback
-│   │   │   ├── learning.py        # Contextual payee questions & persistent rules
-│   │   │   └── system.py          # Health, summary accounting, tone preference, demo data
-│   │   └── services/
-│   │       ├── csv_importer.py    # Deterministic CSV parser, confidence scoring, PhonePe support
-│   │       ├── accounting.py      # Spending totals, pace, merchants
-│   │       ├── habit_engine.py    # Longitudinal habit pattern detection & tone styling
-│   │       ├── learning_engine.py # One-tap clarification & retroactive re-tagging
-│   │       ├── ai_generator.py    # Ollama integration + fallback template engine
-│   │       └── demo_data.py       # Realistic 6-month synthetic dataset
-│   ├── fixtures/
-│   │   └── anonymized_bank_export.csv  # Anonymized real-world export fixture
-│   ├── tests/
-│   │   ├── test_csv_importer.py
-│   │   ├── test_accounting.py
-│   │   ├── test_habits.py
-│   │   ├── test_ai_fallback.py
-│   │   ├── test_real_anonymized_export.py
-│   │   ├── test_persistent_learning.py
-│   │   ├── test_phonepe_export.py
-│   │   ├── test_database_isolation.py
-│   │   ├── test_successive_imports.py
-│   │   └── test_transaction_direction.py
-│   └── requirements.txt
-├── frontend/
-│   ├── app/
-│   │   ├── layout.tsx             # Next.js App Router root layout + Lenis scroll
-│   │   ├── page.tsx               # Main Usually dashboard
-│   │   └── globals.css            # Dark editorial theme with subtle noise overlay
-│   ├── src/
-│   │   ├── api/client.ts          # Typed API client
-│   │   ├── components/
-│   │   │   ├── Navbar.tsx         # Top bar with health, privacy, and tone selector
-│   │   │   ├── CSVImportModal.tsx # Drag & drop CSV import & confidence mapper
-│   │   │   ├── NotificationFeed.tsx # Hero habit notification cards
-│   │   │   ├── HabitMemoryView.tsx  # Longitudinal habit memory view
-│   │   │   ├── PayeeQuestionsBanner.tsx # One-tap payee clarification cards
-│   │   │   ├── SpendingSummary.tsx  # Spending pace, merchants, categories
-│   │   │   ├── TransactionList.tsx  # Searchable & editable transactions with direction badges
-│   │   │   └── LenisProvider.tsx  # Smooth kinetic scrolling provider
-│   │   ├── lib/
-│   │   │   ├── lenis.ts           # Lenis smooth scroll engine
-│   │   │   ├── gsap.ts            # GSAP kinetic animation setup
-│   │   │   └── utils.ts           # UI and currency formatting utilities
-│   │   └── types/index.ts         # TypeScript definitions
-│   ├── next.config.ts             # Next.js API proxy and config
-│   └── package.json
-├── scripts/
-│   ├── start-backend.ps1
-│   ├── start-frontend.ps1
-│   └── run-tests.ps1
-└── README.md
-```
+> [!IMPORTANT]
+> **The Public Demo is NOT a multi-user service:** It intentionally serves synthetic data in read-only mode to demonstrate Usually's habit engine and accounting invariants without collecting, aggregating, or persisting any visitor financial data.
 
 ---
 
-## Quickstart & Running the Project
+## Architectural Principles & Data Integrity
+
+1. **Deterministic Financial Accounting:**
+   - Pure mathematical calculations for income, living expenses, transfers, refunds, and pacing.
+   - Credit card payoffs, self-transfers, and investment deposits are partitioned into transfer categories to prevent false inflation of consumption spending.
+   - Enforces 16 mathematical accounting invariants covered by automated regression tests.
+2. **Defensible Fingerprinting & Deduplication:**
+   - Content-addressable SHA-256 fingerprinting distinguishes legitimate repeated transactions on the same day from identical duplicate statement re-imports.
+3. **Evidence-Grounded Observations:**
+   - Usually never outputs an observation unless the imported ledger strictly satisfies minimum longitudinal evidence criteria (frequency, cadence, confidence $\ge 0.5$, recency $\le 30$ days). Numbers are never hallucinated.
+4. **Offline Deterministic Fallback:**
+   - If a local Ollama instance (`gemma2:2b`) is online, it writes natural language headlines validated against verified evidence facts. If offline, Usually defaults seamlessly to built-in editorial templates with zero downtime.
+
+---
+
+## Local Installation (For Private Personal Data)
+
+To analyze your personal bank or UPI statements privately with SQLite storage on your own computer:
 
 ### Prerequisites
-- Python 3.10+ (tested on Python 3.13)
-- Node.js 18+ (tested on Node v24)
+- Python 3.10+ (tested on Python 3.11 and 3.13)
+- Node.js 18+ (tested on Node v20 and v24)
 - (Optional) [Ollama](https://ollama.com) running `gemma2:2b`
 
-### 1. Setup and Run the Backend
+### 1. Backend Setup
+```bash
+# Clone the repository
+git clone https://github.com/debashis-sharingan-21/usually.git
+cd usually
 
-```powershell
-# From the project root (D:\usually):
-.\backend\venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+# Create and activate virtual environment
+python -m venv backend/venv
+source backend/venv/bin/activate  # On Windows: .\backend\venv\Scripts\Activate.ps1
 
-# Start backend server:
-.\scripts\start-backend.ps1
-# Or directly:
-$env:PYTHONPATH = "backend"
-.\backend\venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+# Install dependencies
+pip install -r backend/requirements.txt
+
+# Start backend server
+uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload
 ```
-The FastAPI backend will start at `http://127.0.0.1:8000` with interactive Swagger docs at `http://127.0.0.1:8000/docs`.
+Backend starts at `http://127.0.0.1:8000` with interactive API docs at `http://127.0.0.1:8000/docs`.
 
-### 2. Setup and Run the Frontend
-
-```powershell
+### 2. Frontend Setup
+```bash
 # In another terminal:
 cd frontend
 npm install
 npm run dev
 ```
-Open your browser at `http://localhost:5173`.
+Open `http://localhost:3000` in your browser. All parsing, local SQLite storage, and habit detection run strictly on your machine.
+
+---
+
+## Public Demo Deployment Guide
+
+### A. Railway (Backend Deployment)
+
+The backend runs as a containerized FastAPI application with an attached persistent volume for SQLite storage.
+
+1. **Create Project:** On [Railway](https://railway.app), create a new project and connect the `debashis-sharingan-21/usually` GitHub repository.
+2. **Configure Build:**
+   - **Root Directory:** `/` (repo root) or `/backend`
+   - **Dockerfile Path:** `backend/Dockerfile`
+3. **Attach Persistent Storage Volume:**
+   - Add a Volume to the backend service.
+   - Set the mount path to: `/data`
+   - *This ensures the synthetic demo SQLite database (`/data/usually_demo.db`) persists across deployments.*
+4. **Environment Variables:**
+   - `USUALLY_DEPLOYMENT_MODE`: `public_demo`
+   - `USUALLY_DEMO_DB_PATH`: `/data/usually_demo.db`
+   - `USUALLY_ALLOWED_ORIGINS`: `https://your-app.vercel.app` (your Vercel frontend URL)
+   - `PORT`: `8000` (Railway automatically assigns the external port)
+5. **Healthcheck Endpoint:**
+   - Healthcheck Path: `/health`
+   - Returns: `{"status": "ok", "deployment_mode": "public_demo", "database": "connected"}`
+
+---
+
+### B. Vercel (Frontend Deployment)
+
+The Next.js App Router frontend deploys to Vercel and forwards `/api/*` requests to the Railway backend.
+
+1. **Import Project:** On [Vercel](https://vercel.com), import the `debashis-sharingan-21/usually` repository.
+2. **Configure Framework & Directory:**
+   - **Framework Preset:** Next.js
+   - **Root Directory:** `frontend`
+3. **Environment Variables:**
+   - `USUALLY_API_URL`: Your Railway backend domain (e.g. `https://usually-production.up.railway.app`)
+   - `NEXT_PUBLIC_USUALLY_PUBLIC_DEMO`: `true`
+4. **Deploy:** Click **Deploy**. Vercel will build the frontend with Turbopack and proxy all `/api/*` traffic cleanly to your Railway backend.
+5. **Redeploy Reminder:** If you update the Railway backend URL, update `USUALLY_API_URL` in Vercel Project Settings and trigger a redeploy.
+
+---
+
+## SQLite Constraints & Single-Instance Architecture
+
+- **Single Process Constraint:** SQLite is an embedded database that operates via local file locks (`WAL` mode). In cloud deployments like Railway, run **1 replica** of the backend service to prevent split-brain database locks.
+- **Backups:** Because the persistent volume is mounted at `/data`, snapshot backups can be taken directly from the Railway volume dashboard.
 
 ---
 
 ## Automated Test Suite
 
-Run the full suite of unit and integration tests:
+Usually maintains a test suite of **73 automated regression tests** covering accounting logic, CSV parsing, habit detection, database isolation, and public demo security.
 
-```powershell
-.\scripts\run-tests.ps1
-# Or:
-.\backend\venv\Scripts\pytest.exe backend\tests -v
+```bash
+# Run the entire test suite:
+pytest backend/tests/ -v
 ```
 
-### Verified Test Results (22/22 passing):
-- `test_accounting.py`: Verifies deterministic totals, transfer exclusion from consumption expenses, refunds, and cash flow.
-- `test_csv_importer.py`: Tests date formats (`YYYY-MM-DD`, `DD/MM/YYYY`, `DD-Mon-YYYY`, ISO), amounts (commas, parentheses negatives, CR/DR), and duplicate fingerprinting.
-- `test_habits.py`: Enforces minimum evidence thresholds (sparse history suppresses habits; multi-week patterns trigger reliably; user muting suppresses alerts).
-- `test_ai_fallback.py`: Tests offline fallback to deterministic templates, and verifies that the claim validator strictly rejects hallucinated numbers.
-- `test_real_anonymized_export.py`: Validates against real anonymized bank statement formats (`Txn Date`, `Narration / Description`, `Withdrawal (Dr)`, `Deposit (Cr)`).
-- `test_persistent_learning.py`: Verifies one-tap clarification question generation, persistent rule storage, retroactive transaction re-tagging, and inheritance on future imports.
-- `test_phonepe_export.py`: Validates PhonePe statement structure (metadata preamble, tab-prefixed times, explicit Debit/Credit direction, 471 scanned nonblank rows, 467 accepted, 4 rejected records, 1 blank row skipped, duplicate suppression, and separated financial metrics).
-- `test_database_isolation.py`: Verifies physical segregation between demo data (`usually_demo.db`) and personal data (`usually.db`), preventing synthetic demo habits from ever contaminating real user insights.
-- `test_successive_imports.py`: Validates multi-month habit evolution and pacing shifts across successive overlapping statement imports without duplicate contamination.
+### Key Test Suites:
+- `test_public_demo.py` (12 tests): Demonstrates server-side read-only enforcement, public demo context pinning, personal database prohibition, idempotent synthetic seeding, and HTTP 403 rejection of all mutations.
+- `test_financial_invariants.py` (16 tests): Validates mathematical purity, non-negative amounts, authoritative balance identity, and delimiter resilience.
+- `test_database_isolation.py`: Guarantees physical segregation between demo and personal SQLite files.
+- `test_csv_importer.py` & `test_phonepe_2026_parsing.py`: Verifies resilient parsing across standard CSV, TSV, semicolon, and PhonePe statement structures.
+- `test_habits.py` & `test_notifications_endpoint.py`: Validates evidence-backed observation generation and 30-day recency windows.
 
 ---
 
-## Demo Script
+## License
 
-1. **Launch App:** Open `http://localhost:5173`. You will see the dark-mode editorial onboarding screen.
-2. **Explore with Demo Data:** Click **&ldquo;Explore with 6-Month Demo Data&rdquo;** (or **&ldquo;Try Demo Data&rdquo;** in the navbar).
-   - This seeds 95 realistic transactions spanning May to October 2026.
-3. **Inspect the Habit Feed:**
-   - Notice the Swiggy observation: *&ldquo;Wednesday again. You've ordered from Swiggy on 4 of your last 5 Wednesdays...&rdquo;*
-   - Notice the Amazon observation: *&ldquo;Amazon has appeared in 5 of your last 6 months. A quiet month so far...&rdquo;*
-   - Notice the Food & Dining pace shift observation.
-4. **Inspect Evidence:** Click **&ldquo;Inspect Supporting Evidence&rdquo;** on any card to view the exact dates, counts, and privacy disclosure.
-5. **Test Habit Control:** Click **&ldquo;Confirm&rdquo;** or **&ldquo;Mute&rdquo;**. Muted habits are instantly suppressed from the feed.
-6. **Test CSV Import:** Click **&ldquo;Import CSV&rdquo;** in the navbar.
-   - Drag and drop `backend/fixtures/anonymized_bank_export.csv`.
-   - Observe automatic column mapping, row-by-row status preview, and date range detection.
-   - Click **&ldquo;Confirm & Import&rdquo;**.
-7. **Privacy Control:** Click **&ldquo;Clear&rdquo;** in the navbar to permanently purge all transactions and habit records from your local machine.
-
----
-
-## Local AI Setup (Optional)
-
-If you would like to test with Gemma running locally:
-1. Install [Ollama](https://ollama.com).
-2. Pull the Gemma model:
-   ```bash
-   ollama pull gemma2:2b
-   ```
-3. Start the Ollama server:
-   ```bash
-   ollama serve
-   ```
-Usually will automatically detect the running instance on `http://127.0.0.1:11434` and update the status pill in the navbar. If Ollama is offline or not installed, Usually operates seamlessly with its deterministic template engine.
-
----
-
-## Near-Zero-Effort Import & Persistent Learning
-
-1. **Automatic Header & Preamble Detection:**
-   - Real-world exports (such as UPI/PhonePe statements) frequently include multi-line metadata preambles (e.g. `Transaction Statement for +91...`, date range rows) and disclaimer footers.
-   - Usually's parser detects and skips non-tabular preamble lines, locates the real column headers, and discards footer notices automatically.
-
-2. **Smart Column Recognition & Confidence:**
-   - Scans candidate columns with regex patterns and checks sample cell formats (ISO dates, Indian dates `DD/MM/YYYY`, explicit Debit/Credit strings, numerical amounts).
-   - If confidence $\ge 85\%$, it enables **One-Click Instant Import** without forcing manual mapping.
-
-3. **Contextual One-Tap Payee Learning:**
-   - When recurring payments to a counterparty are detected without an obvious commercial category, Usually generates a dismissible, one-tap question (e.g. *“I noticed several payments to Ramu. What kind of payments are these?”* with choices like *Friend or family*, *Rent or household*, *Transfer between accounts*).
-   - Once answered, the classification is saved to SQLite (`learned_payees`), immediately retroactively tags past transactions, and automatically applies to all future statement imports.
-
-4. **Real PhonePe Export Test Suite:**
-   - Tested against an actual 467-row PhonePe statement export (`Date`, `Time`, `Transaction Details`, `Transaction ID`, `UTR`, `Transaction Type`, `Credit/debit instrument`, `Amount`).
-   - Handles tab-prefixed timestamps (`\t19:07`), explicit `Debit`/`Credit` transaction types, and detects incomplete rows.
-   - Full test outcome: **467 total records processed, 467 valid accepted (305 debits totaling ₹75,880.89, 162 credits totaling ₹86,071.89), 0 rejected, 0 duplicates on initial batch, 467 duplicate rejections on immediate re-import.**
-
----
-
-## Known Limitations
-
-- **Bank Format Diversity:** While tested against standard CSV exports and UPI statement formats, exotic bank exports (such as multi-header PDFs converted to CSV with merged cells) require manual column mapping.
-- **Category Nuances:** Initial categorization relies on pattern heuristics; users can update or correct categories directly in the **Transactions** tab.
+MIT License. Built for Hacktoberfest 2026.
