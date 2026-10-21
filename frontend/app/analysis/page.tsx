@@ -1,9 +1,11 @@
 "use client";
 
-import React from 'react';
+import React, { useRef } from 'react';
 import Link from 'next/link';
 import { useStatement } from '@/context/StatementContext';
 import { HabitMemoryView } from '@/components/HabitMemoryView';
+import gsap from 'gsap';
+import { useGsapContext } from '@/lib/motion';
 import {
   TrendingUp,
   TrendingDown,
@@ -21,6 +23,59 @@ import {
 
 export default function AnalysisPage() {
   const { summary, habits, loadAll } = useStatement();
+  const analysisRef = useRef<HTMLDivElement>(null);
+
+  const hasData = Boolean(summary && summary.transaction_count > 0);
+
+  useGsapContext(
+    analysisRef,
+    () => {
+      const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+
+      // 1. Editorial header
+      tl.from('.analysis-header', {
+        opacity: 0,
+        y: 6,
+        duration: 0.28,
+      });
+
+      // 2. Section 01: Cash flow cards
+      tl.from(
+        '.analysis-cashflow-card',
+        {
+          opacity: 0,
+          y: 8,
+          duration: 0.28,
+          stagger: 0.05,
+        },
+        '-=0.15'
+      );
+
+      // 3. Section 02: Pace benchmark (if present)
+      tl.from(
+        '.analysis-pace-card',
+        {
+          opacity: 0,
+          y: 8,
+          duration: 0.28,
+        },
+        '-=0.12'
+      );
+
+      // 4. Section 03: Category and Counterparties
+      tl.from(
+        '.analysis-category-card',
+        {
+          opacity: 0,
+          y: 8,
+          duration: 0.28,
+          stagger: 0.08,
+        },
+        '-=0.12'
+      );
+    },
+    [hasData, summary?.transaction_count]
+  );
 
   if (!summary || summary.transaction_count === 0) {
     return (
@@ -53,10 +108,10 @@ export default function AnalysisPage() {
   const consumerSurplus = summary.consumer_margin ?? (externalInflows - summary.total_expenses);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-10 animate-fade-in">
+    <div ref={analysisRef} className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-10 animate-fade-in">
       
       {/* Editorial Header */}
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-[#DFD9CA] pb-4">
+      <div className="analysis-header flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-[#DFD9CA] pb-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs uppercase tracking-widest text-[#365844] font-medium">
@@ -92,7 +147,7 @@ export default function AnalysisPage() {
         {/* Primary 4 Metric Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
           {/* Consumer Expenses */}
-          <div className="paper-sheet p-5 space-y-1">
+          <div className="analysis-cashflow-card paper-sheet-interactive p-5 space-y-1">
             <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
               <span>Living Expenses</span>
               <ArrowUpRight className="w-3.5 h-3.5 text-[#C85A32]" />
@@ -106,7 +161,7 @@ export default function AnalysisPage() {
           </div>
 
           {/* Transfers & CC Settlements Out */}
-          <div className="paper-sheet p-5 space-y-1">
+          <div className="analysis-cashflow-card paper-sheet-interactive p-5 space-y-1">
             <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
               <span>Transfers Out</span>
               <Repeat className="w-3.5 h-3.5 text-[#606860]" />
@@ -120,7 +175,7 @@ export default function AnalysisPage() {
           </div>
 
           {/* Total Inflows */}
-          <div className="paper-sheet p-5 space-y-1">
+          <div className="analysis-cashflow-card paper-sheet-interactive p-5 space-y-1">
             <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
               <span>Gross Inflow</span>
               <ArrowDownLeft className="w-3.5 h-3.5 text-[#365844]" />
@@ -138,7 +193,7 @@ export default function AnalysisPage() {
           </div>
 
           {/* Gross Balance Change */}
-          <div className="paper-sheet p-5 space-y-1">
+          <div className="analysis-cashflow-card paper-sheet-interactive p-5 space-y-1">
             <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
               <span>Account Delta</span>
               <Coins className="w-3.5 h-3.5 text-[#365844]" />
@@ -194,7 +249,7 @@ export default function AnalysisPage() {
             </h2>
           </div>
 
-          <div className="paper-sheet p-6 space-y-4">
+          <div className="analysis-pace-card paper-sheet-interactive p-6 space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
               <div className="flex items-start gap-3.5">
                 <div className="p-2.5 rounded-xl bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA] mt-0.5">
@@ -259,7 +314,7 @@ export default function AnalysisPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {/* Top Categories */}
-          <div className="paper-sheet p-6 space-y-4">
+          <div className="analysis-category-card paper-sheet-interactive p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-[#EEEBDD] pb-3">
               <div className="flex items-center gap-2">
                 <PieChart className="w-4 h-4 text-[#365844]" />
@@ -291,7 +346,7 @@ export default function AnalysisPage() {
           </div>
 
           {/* Top Counterparties */}
-          <div className="paper-sheet p-6 space-y-4">
+          <div className="analysis-category-card paper-sheet-interactive p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-[#EEEBDD] pb-3">
               <div className="flex items-center gap-2">
                 <Store className="w-4 h-4 text-[#365844]" />

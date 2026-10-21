@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useStatement } from '@/context/StatementContext';
 import { selectBriefingAndNotifications } from '@/lib/briefing';
 import { SlothMascot } from '@/components/SlothMascot';
 import { PayeeQuestionsBanner } from '@/components/PayeeQuestionsBanner';
 import { sendHabitFeedback } from '@/api/client';
+import gsap from 'gsap';
+import { useGsapContext } from '@/lib/motion';
 import {
   Sparkles,
   ArrowRight,
@@ -41,10 +43,101 @@ export default function HomePage() {
 
   const [expandedEvidence, setExpandedEvidence] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const homeRef = useRef<HTMLDivElement>(null);
 
   const hasData = (health?.transaction_count || 0) > 0;
   const briefing = selectBriefingAndNotifications(notifications, summary);
   const featured = briefing.featuredObservation;
+
+  // Restrained GSAP entrance sequence for the homepage
+  useGsapContext(
+    homeRef,
+    () => {
+      const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+
+      if (hasData) {
+        // 1. Briefing header
+        tl.from('.home-briefing-header', {
+          opacity: 0,
+          y: 6,
+          duration: 0.28,
+        });
+
+        // 2. Primary featured observation
+        tl.from(
+          '.home-featured-card',
+          {
+            opacity: 0,
+            y: 8,
+            duration: 0.32,
+          },
+          '-=0.14'
+        );
+
+        // 3. Secondary observations (if any)
+        tl.from(
+          '.home-secondary-card',
+          {
+            opacity: 0,
+            y: 6,
+            duration: 0.24,
+            stagger: 0.05,
+          },
+          '-=0.12'
+        );
+
+        // 4. Financial snapshot cards
+        tl.from(
+          '.home-metric-card',
+          {
+            opacity: 0,
+            y: 6,
+            duration: 0.26,
+            stagger: 0.05,
+          },
+          '-=0.1'
+        );
+
+        // 5. Explore Detailed Analysis Link
+        tl.from(
+          '.home-analysis-link',
+          {
+            opacity: 0,
+            y: 6,
+            duration: 0.24,
+          },
+          '-=0.1'
+        );
+      } else {
+        // Calm onboarding entrance
+        tl.from('.home-onboarding-mascot', {
+          opacity: 0,
+          scale: 0.94,
+          duration: 0.35,
+        });
+        tl.from(
+          '.home-onboarding-text',
+          {
+            opacity: 0,
+            y: 8,
+            duration: 0.3,
+          },
+          '-=0.15'
+        );
+        tl.from(
+          '.home-onboarding-actions',
+          {
+            opacity: 0,
+            y: 6,
+            duration: 0.25,
+            stagger: 0.06,
+          },
+          '-=0.12'
+        );
+      }
+    },
+    [hasData, featured?.habit_key, briefing.secondaryObservations.length]
+  );
 
   const handleFeedback = async (habitKey: string, status: 'confirmed' | 'muted') => {
     setFeedbackLoading(true);
@@ -74,7 +167,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-7 animate-fade-in">
+    <div ref={homeRef} className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-7 animate-fade-in">
       
       {/* Pending Payee Clarification Banner */}
       {questions.length > 0 && (
@@ -92,13 +185,13 @@ export default function HomePage() {
       {!hasData && !loading ? (
         /* Empty / Onboarding State */
         <div className="py-12 sm:py-16 text-center space-y-8">
-          <div className="flex justify-center">
+          <div className="home-onboarding-mascot flex justify-center">
             <div className="p-4 rounded-3xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
               <SlothMascot mood="peaceful" size={96} />
             </div>
           </div>
 
-          <div className="space-y-3.5 max-w-xl mx-auto">
+          <div className="home-onboarding-text space-y-3.5 max-w-xl mx-auto">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#EEEBDD] border border-[#DFD9CA] text-[11px] font-mono text-[#365844]">
               <span>Hacktoberfest 2026</span>
               <span>•</span>
@@ -117,7 +210,7 @@ export default function HomePage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <div className="home-onboarding-actions flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
               onClick={handleLoadDemo}
               disabled={isDemoLoading}
@@ -137,7 +230,7 @@ export default function HomePage() {
           </div>
 
           {/* Core Architectural Guarantees */}
-          <div className="pt-6 max-w-lg mx-auto text-left">
+          <div className="home-onboarding-guarantees pt-6 max-w-lg mx-auto text-left">
             <div className="p-5 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] space-y-3 text-xs text-[#606860]">
               <div className="font-mono text-[11px] font-semibold uppercase text-[#365844]">
                 Local-First Privacy Guarantees
@@ -160,7 +253,7 @@ export default function HomePage() {
         <div className="space-y-6">
           
           {/* Section Greeting & Statement Period */}
-          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-[#DFD9CA] pb-4">
+          <div className="home-briefing-header flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 border-b border-[#DFD9CA] pb-4">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-xs uppercase tracking-widest text-[#365844] font-medium">
@@ -187,7 +280,7 @@ export default function HomePage() {
 
           {/* Featured Observation Sheet */}
           {featured ? (
-            <article className="paper-sheet p-6 sm:p-8 space-y-4 animate-slide-up">
+            <article className="home-featured-card paper-sheet p-6 sm:p-8 space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-[#EEEBDD] border border-[#DFD9CA]">
@@ -288,7 +381,7 @@ export default function HomePage() {
             </article>
           ) : (
             /* Differentiated Quiet States */
-            <div className="paper-sheet p-8 text-center space-y-4">
+            <div className="home-featured-card paper-sheet p-8 text-center space-y-4">
               <div className="flex justify-center">
                 <div className="p-3.5 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm">
                   <SlothMascot mood="peaceful" size="lg" />
@@ -315,7 +408,7 @@ export default function HomePage() {
                 {briefing.secondaryObservations.map((obs) => (
                   <div
                     key={obs.habit_key}
-                    className="paper-sheet-interactive p-4 flex flex-col justify-between space-y-2"
+                    className="home-secondary-card paper-sheet-interactive p-4 flex flex-col justify-between space-y-2"
                   >
                     <div>
                       <div className="flex items-center justify-between text-[10px] font-mono text-[#8A928A] mb-1">
@@ -337,7 +430,7 @@ export default function HomePage() {
 
           {/* Compact Financial Summary (3 Reconciled Numbers) */}
           {summary && summary.transaction_count > 0 && (
-            <div className="space-y-3 pt-2">
+            <div className="home-overview-container space-y-3 pt-2">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs uppercase tracking-wider text-[#606860]">
                   Statement Cash Flow Overview
@@ -349,7 +442,7 @@ export default function HomePage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {/* Consumer Living Expenses */}
-                <div className="paper-sheet p-5 space-y-1">
+                <div className="home-metric-card paper-sheet-interactive p-5 space-y-1">
                   <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
                     <span>Living Expenses</span>
                     <ArrowUpRight className="w-3.5 h-3.5 text-[#C85A32]" />
@@ -363,7 +456,7 @@ export default function HomePage() {
                 </div>
 
                 {/* Incoming Credits */}
-                <div className="paper-sheet p-5 space-y-1">
+                <div className="home-metric-card paper-sheet-interactive p-5 space-y-1">
                   <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
                     <span>Incoming Credits</span>
                     <ArrowDownLeft className="w-3.5 h-3.5 text-[#365844]" />
@@ -381,7 +474,7 @@ export default function HomePage() {
                 </div>
 
                 {/* Net Balance Delta */}
-                <div className="paper-sheet p-5 space-y-1">
+                <div className="home-metric-card paper-sheet-interactive p-5 space-y-1">
                   <div className="flex items-center justify-between text-xs text-[#606860] font-mono">
                     <span>Net Balance Delta</span>
                     <Coins className="w-3.5 h-3.5 text-[#365844]" />
@@ -398,7 +491,7 @@ export default function HomePage() {
           )}
 
           {/* Clear Link to Full Analysis Destination */}
-          <div className="pt-2">
+          <div className="home-analysis-link pt-2">
             <Link
               href="/analysis"
               className="paper-sheet-interactive p-5 flex items-center justify-between group cursor-pointer block"

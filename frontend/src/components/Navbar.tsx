@@ -83,14 +83,14 @@ export const Navbar: React.FC = () => {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`text-xs px-3.5 py-1.5 rounded-lg transition-all duration-150 font-medium flex items-center gap-1.5 ${
+                  className={`text-xs px-3.5 py-1.5 rounded-lg transition-all duration-150 font-medium flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844] focus-visible:ring-offset-1 active:scale-[0.98] ${
                     isActive
-                      ? 'bg-[#FCFBF7] text-[#292D29] border border-[#DFD9CA] shadow-2xs'
+                      ? 'bg-[#FCFBF7] text-[#292D29] border border-[#DFD9CA] shadow-2xs font-semibold'
                       : 'text-[#606860] hover:text-[#292D29] hover:bg-[#EEEBDD]'
                   }`}
                   aria-current={isActive ? 'page' : undefined}
                 >
-                  <link.icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#365844]' : 'text-[#8A928A]'}`} />
+                  <link.icon className={`w-3.5 h-3.5 transition-colors duration-150 ${isActive ? 'text-[#365844]' : 'text-[#8A928A]'}`} />
                   <span>{link.label}</span>
                 </Link>
               );
@@ -234,14 +234,17 @@ export const Navbar: React.FC = () => {
             <Link
               key={link.href}
               href={link.href}
-              className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[11px] font-medium transition-all duration-150 ${
+              className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[11px] font-medium transition-all duration-150 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844] ${
                 isActive
-                  ? 'text-[#365844]'
+                  ? 'text-[#365844] font-semibold'
                   : 'text-[#8A928A] hover:text-[#292D29]'
               }`}
             >
-              <link.icon className={`w-5 h-5 ${isActive ? 'text-[#365844]' : 'text-[#8A928A]'}`} />
+              <link.icon className={`w-5 h-5 transition-transform duration-150 ${isActive ? 'text-[#365844] scale-105' : 'text-[#8A928A]'}`} />
               <span>{link.label}</span>
+              {isActive && (
+                <span className="w-1 h-1 rounded-full bg-[#365844] -mt-0.5" aria-hidden="true" />
+              )}
             </Link>
           );
         })}
@@ -249,7 +252,7 @@ export const Navbar: React.FC = () => {
         {/* Mobile Quick Import button */}
         <button
           onClick={() => setIsImportOpen(true)}
-          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[11px] font-medium text-[#365844] hover:text-[#2c4737]"
+          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-lg text-[11px] font-medium text-[#365844] hover:text-[#2c4737] active:scale-95 transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
           title="Import Statement"
         >
           <UploadCloud className="w-5 h-5" />

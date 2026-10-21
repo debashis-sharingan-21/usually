@@ -112,7 +112,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
                 placeholder="Search counterparty or raw memo..."
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-                className="pl-8 pr-3 py-1.5 bg-[#F7F5EE] border border-[#DFD9CA] rounded-lg text-xs text-[#292D29] placeholder-[#8A928A] focus:outline-none focus:border-[#365844] w-48 sm:w-64 font-sans"
+                className="pl-8 pr-3 py-1.5 bg-[#F7F5EE] border border-[#DFD9CA] rounded-lg text-xs text-[#292D29] placeholder-[#8A928A] focus:outline-none focus:border-[#365844] focus:ring-2 focus:ring-[#365844]/20 transition-all w-48 sm:w-64 font-sans"
               />
             </div>
 
@@ -120,7 +120,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
             <select
               value={directionFilter}
               onChange={(e) => { setDirectionFilter(e.target.value); setPage(0); }}
-              className="py-1.5 px-3 bg-[#F7F5EE] border border-[#DFD9CA] rounded-lg text-xs text-[#292D29] focus:outline-none focus:border-[#365844] font-sans"
+              className="py-1.5 px-3 bg-[#F7F5EE] border border-[#DFD9CA] rounded-lg text-xs text-[#292D29] focus:outline-none focus:border-[#365844] focus:ring-2 focus:ring-[#365844]/20 transition-all font-sans cursor-pointer"
             >
               <option value="">All Flow Types</option>
               <option value="debit">Debits (Outflow)</option>
@@ -131,7 +131,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
             <select
               value={categoryFilter}
               onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}
-              className="py-1.5 px-3 bg-[#F7F5EE] border border-[#DFD9CA] rounded-lg text-xs text-[#292D29] focus:outline-none focus:border-[#365844] font-sans"
+              className="py-1.5 px-3 bg-[#F7F5EE] border border-[#DFD9CA] rounded-lg text-xs text-[#292D29] focus:outline-none focus:border-[#365844] focus:ring-2 focus:ring-[#365844]/20 transition-all font-sans cursor-pointer"
             >
               <option value="">All Categories</option>
               {CATEGORIES.map((c) => (
@@ -257,14 +257,14 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
                             <div className="flex items-center justify-end gap-1">
                               <button
                                 onClick={() => saveEdit(t.id)}
-                                className="p-1 text-[#365844] hover:bg-[#365844]/10 rounded cursor-pointer"
+                                className="p-1 text-[#365844] hover:bg-[#365844]/10 rounded cursor-pointer btn-tactile focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
                                 title="Save changes"
                               >
                                 <Check className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={cancelEdit}
-                                className="p-1 text-[#8A928A] hover:bg-[#EEEBDD] rounded cursor-pointer"
+                                className="p-1 text-[#8A928A] hover:bg-[#EEEBDD] rounded cursor-pointer btn-tactile focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
                                 title="Cancel"
                               >
                                 <X className="w-3.5 h-3.5" />
@@ -273,7 +273,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
                           ) : (
                             <button
                               onClick={() => startEdit(t)}
-                              className="p-1 text-[#8A928A] hover:text-[#292D29] rounded hover:bg-[#EEEBDD] transition-colors cursor-pointer"
+                              className="p-1.5 text-[#8A928A] hover:text-[#292D29] rounded-lg hover:bg-[#EEEBDD] transition-colors btn-tactile cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
                               title="Edit merchant name or category"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
@@ -298,7 +298,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
                 <button
                   onClick={() => setPage((p) => Math.max(p - 1, 0))}
                   disabled={page === 0}
-                  className="px-2.5 py-1 rounded bg-[#FCFBF7] border border-[#DFD9CA] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEEBDD] text-[#292D29] flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-[#FCFBF7] border border-[#DFD9CA] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEEBDD] text-[#292D29] flex items-center gap-1 cursor-pointer btn-tactile transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
                 >
                   <ArrowLeft className="w-3 h-3" />
                   <span>Previous</span>
@@ -309,7 +309,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
                 <button
                   onClick={() => setPage((p) => Math.min(p + 1, totalPages - 1))}
                   disabled={page >= totalPages - 1}
-                  className="px-2.5 py-1 rounded bg-[#FCFBF7] border border-[#DFD9CA] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEEBDD] text-[#292D29] flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-[#FCFBF7] border border-[#DFD9CA] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEEBDD] text-[#292D29] flex items-center gap-1 cursor-pointer btn-tactile transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
                 >
                   <span>Next</span>
                   <ArrowRight className="w-3 h-3" />
