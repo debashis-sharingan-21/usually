@@ -1,13 +1,13 @@
-from fastapi import HTTPException
-from app.config import is_public_demo
+from fastapi import Depends
+from app.workspace import require_personal_workspace, WorkspaceContext
 
-def verify_write_permission():
+def verify_write_permission(
+    workspace: WorkspaceContext = Depends(require_personal_workspace)
+) -> WorkspaceContext:
     """
-    FastAPI dependency that enforces the read-only policy for public demo mode.
-    Rejects any database mutation attempt with HTTP 403 Forbidden.
+    FastAPI dependency that enforces write security:
+    - Rejects any mutation on the synthetic demo dataset (HTTP 403).
+    - Requires authenticated session in hosted/public mode (HTTP 401).
+    - Returns the active isolated WorkspaceContext.
     """
-    if is_public_demo():
-        raise HTTPException(
-            status_code=403,
-            detail="Mutations are disabled in public demo mode. Run Usually locally for private data and statement imports."
-        )
+    return workspace

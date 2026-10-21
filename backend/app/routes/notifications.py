@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from typing import List, Optional
 from datetime import datetime
 import sqlite3
 from app.database import get_connection
+from app.workspace import get_current_workspace, WorkspaceContext
 from app.services.habit_engine import detect_habits
 from app.models.schema import HabitObservation
 from app.services.ai_generator import generate_observation_with_ai
@@ -13,7 +14,8 @@ RECENT_WINDOW_DAYS = 30
 
 @router.get("", response_model=List[HabitObservation])
 def list_notifications(
-    reference_date: Optional[str] = Query(None, description="ISO-8601 YYYY-MM-DD reference date for recency calculations")
+    reference_date: Optional[str] = Query(None, description="ISO-8601 YYYY-MM-DD reference date for recency calculations"),
+    workspace: WorkspaceContext = Depends(get_current_workspace)
 ):
     """
     Returns prioritized, evidence-backed notifications for the active database context.
@@ -28,7 +30,7 @@ def list_notifications(
        - Statistical confidence descending
     5. Returns an honest empty list if no recent activity qualifies.
     """
-    conn = get_connection()
+    conn = get_connection(workspace=workspace)
     try:
         raw_habits = detect_habits(conn, reference_date=reference_date)
         if not raw_habits:

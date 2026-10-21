@@ -244,11 +244,15 @@ export default function HomePage() {
               <ul className="space-y-2">
                 <li className="flex items-start gap-2">
                   <ShieldCheck className="w-4 h-4 text-[#365844] shrink-0 mt-0.5" />
-                  <span><strong>Zero cloud transmit:</strong> Raw CSVs, account numbers, and transactions stay on this machine.</span>
+                  <span><strong>Physical SQLite Isolation:</strong> Each user workspace operates on its own dedicated SQLite database file.</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <ShieldCheck className="w-4 h-4 text-[#365844] shrink-0 mt-0.5" />
                   <span><strong>Deterministic math:</strong> No AI guesses amounts. Double-entry accounting verifies every sum.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#365844] shrink-0 mt-0.5" />
+                  <span><strong>Storage Transparency:</strong> Hosted workspaces persist for your active session. Run Usually locally for permanent offline storage.</span>
                 </li>
               </ul>
             </div>

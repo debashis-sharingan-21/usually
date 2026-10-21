@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any
 from app.database import get_connection
-from app.guards import verify_write_permission
+from app.workspace import get_current_workspace, require_personal_workspace, WorkspaceContext
 from app.services.learning_engine import (
     get_pending_questions,
     answer_payee_question,
@@ -13,16 +13,21 @@ from app.models.schema import PayeeQuestion, PayeeAnswerRequest
 router = APIRouter(prefix="/api/learning", tags=["Persistent Learning"])
 
 @router.get("/questions", response_model=List[PayeeQuestion])
-def fetch_questions():
-    conn = get_connection()
+def fetch_questions(
+    workspace: WorkspaceContext = Depends(get_current_workspace)
+):
+    conn = get_connection(workspace=workspace)
     try:
         return get_pending_questions(conn)
     finally:
         conn.close()
 
-@router.post("/answer", dependencies=[Depends(verify_write_permission)])
-def submit_answer(payload: PayeeAnswerRequest):
-    conn = get_connection()
+@router.post("/answer")
+def submit_answer(
+    payload: PayeeAnswerRequest,
+    workspace: WorkspaceContext = Depends(require_personal_workspace)
+):
+    conn = get_connection(workspace=workspace)
     try:
         res = answer_payee_question(
             conn=conn,
@@ -38,17 +43,22 @@ def submit_answer(payload: PayeeAnswerRequest):
     finally:
         conn.close()
 
-@router.post("/dismiss/{question_id}", dependencies=[Depends(verify_write_permission)])
-def dismiss_question(question_id: str):
-    conn = get_connection()
+@router.post("/dismiss/{question_id}")
+def dismiss_question(
+    question_id: str,
+    workspace: WorkspaceContext = Depends(require_personal_workspace)
+):
+    conn = get_connection(workspace=workspace)
     try:
         return dismiss_payee_question(conn, question_id)
     finally:
         conn.close()
 
 @router.get("/rules")
-def fetch_rules():
-    conn = get_connection()
+def fetch_rules(
+    workspace: WorkspaceContext = Depends(get_current_workspace)
+):
+    conn = get_connection(workspace=workspace)
     try:
         return list_learned_payees(conn)
     finally:

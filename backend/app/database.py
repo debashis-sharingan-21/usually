@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from typing import Optional
+from typing import Optional, Any
 from app.config import DATA_DIR, is_public_demo, get_demo_db_path, get_personal_db_path
 
 SCHEMA_SQL = """
@@ -141,17 +141,35 @@ def set_active_context(context: str):
     except Exception:
         pass
 
-def get_connection(context: Optional[str] = None) -> sqlite3.Connection:
-    if is_public_demo():
-        ctx = "demo"
+def get_connection(context: Optional[Any] = None, workspace: Optional[Any] = None) -> sqlite3.Connection:
+    # Defensively handle if a WorkspaceContext was passed as the first positional argument
+    if hasattr(context, "db_path"):
+        workspace = context
+        context = None
+
+    if workspace is not None and getattr(workspace, "db_path", None):
+        path = workspace.db_path
+    elif is_public_demo():
+        path = get_demo_db_path()
     else:
         ctx = context if context is not None else get_active_context()
-    path = get_db_path(ctx)
+        path = get_db_path(ctx)
+
     os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA foreign_keys = ON")
+
+    # If this is a personal workspace, ensure schema and tables are initialized
+    if workspace is not None and getattr(workspace, "workspace_type", None) == "personal":
+        cur = conn.cursor()
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='transactions'")
+        if not cur.fetchone():
+            with conn:
+                conn.executescript(SCHEMA_SQL)
+            migrate_db(conn)
+
     return conn
 
 def heal_and_reconcile_transactions(conn: sqlite3.Connection):
@@ -247,6 +265,13 @@ def migrate_db(conn: sqlite3.Connection):
     heal_and_reconcile_transactions(conn)
 
 def init_db(context: Optional[str] = None):
+    # Initialize authentication database
+    try:
+        from app.services.auth import init_auth_db
+        init_auth_db()
+    except Exception:
+        pass
+
     # Public demo mode is strictly restricted to initializing the demo database.
     if is_public_demo():
         contexts = ["demo"]

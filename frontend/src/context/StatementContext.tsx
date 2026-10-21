@@ -10,7 +10,16 @@ import {
   updateTone,
   switchContext,
   seedDemoData,
-  clearAllData
+  clearAllData,
+  fetchMe,
+  createGuestWorkspace,
+  registerUser as apiRegister,
+  loginUser as apiLogin,
+  logoutUser as apiLogout,
+  deleteWorkspace as apiDeleteWorkspace,
+  getStoredToken,
+  getActiveWorkspaceContext,
+  setActiveWorkspaceContext,
 } from '@/api/client';
 import type {
   SystemHealthResponse,
@@ -19,6 +28,13 @@ import type {
   PayeeQuestion,
   CSVImportResult
 } from '@/types';
+
+export interface UserState {
+  id: string;
+  email?: string | null;
+  is_guest: boolean;
+  workspace_type: string;
+}
 
 interface StatementContextType {
   health: SystemHealthResponse | null;
@@ -30,6 +46,10 @@ interface StatementContextType {
   loadErrors: Record<string, string>;
   isImportOpen: boolean;
   isDemoLoading: boolean;
+  user: UserState | null;
+  workspaceMode: 'personal' | 'demo';
+  isAuthModalOpen: boolean;
+  setIsAuthModalOpen: (open: boolean) => void;
   setIsImportOpen: (open: boolean) => void;
   loadAll: () => Promise<void>;
   handleToneChange: (tone: 'playful' | 'dry' | 'minimal') => Promise<void>;
@@ -37,6 +57,11 @@ interface StatementContextType {
   handleLoadDemo: () => Promise<void>;
   handleClearData: () => Promise<void>;
   handleImportSuccess: (result: CSVImportResult) => Promise<void>;
+  startGuestWorkspace: () => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  deleteCurrentWorkspace: () => Promise<void>;
 }
 
 const StatementContext = createContext<StatementContextType | undefined>(undefined);
@@ -49,9 +74,42 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [questions, setQuestions] = useState<PayeeQuestion[]>([]);
   const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isDemoLoading, setIsDemoLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<UserState | null>(null);
+  const [workspaceMode, setWorkspaceMode] = useState<'personal' | 'demo'>('demo');
   const isFetchingRef = useRef(false);
+
+  // Initialize session and workspace state on client mount
+  useEffect(() => {
+    const initSession = async () => {
+      const storedCtx = getActiveWorkspaceContext();
+      setWorkspaceMode(storedCtx);
+
+      const token = getStoredToken();
+      if (token) {
+        try {
+          const me = await fetchMe();
+          if (me.user_id) {
+            setUser({
+              id: me.user_id,
+              email: me.email,
+              is_guest: me.is_guest,
+              workspace_type: me.workspace_type
+            });
+            if (storedCtx === 'personal') {
+              setWorkspaceMode('personal');
+            }
+          }
+        } catch {
+          // Token expired or invalid
+          setUser(null);
+        }
+      }
+    };
+    initSession();
+  }, []);
 
   const loadAll = useCallback(async () => {
     if (isFetchingRef.current) return;
@@ -69,6 +127,9 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (hRes.status === 'fulfilled') {
         setHealth(hRes.value);
+        if (hRes.value.active_context === 'demo' || hRes.value.active_context === 'personal') {
+          setWorkspaceMode(hRes.value.active_context);
+        }
       } else {
         errors.health = hRes.reason?.message || 'Failed to fetch health';
       }
@@ -83,7 +144,6 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setNotifications(nRes.value);
       } else {
         errors.notifications = nRes.reason?.message || 'Failed to fetch notifications';
-        console.warn('Notifications request failed:', nRes.reason);
       }
 
       if (habRes.status === 'fulfilled') {
@@ -111,6 +171,101 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     loadAll();
   }, [loadAll]);
 
+  const startGuestWorkspace = async () => {
+    try {
+      setLoading(true);
+      const res = await createGuestWorkspace();
+      setUser({
+        id: res.user.id,
+        email: null,
+        is_guest: true,
+        workspace_type: 'personal'
+      });
+      setWorkspaceMode('personal');
+      setActiveWorkspaceContext('personal');
+      await loadAll();
+    } catch (e) {
+      console.error('Failed to create guest workspace:', e);
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (email: string, password: string) => {
+    try {
+      setLoading(true);
+      const res = await apiLogin(email, password);
+      setUser({
+        id: res.user.id,
+        email: res.user.email,
+        is_guest: false,
+        workspace_type: 'personal'
+      });
+      setWorkspaceMode('personal');
+      setActiveWorkspaceContext('personal');
+      await loadAll();
+    } catch (e) {
+      console.error('Login error:', e);
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async (email: string, password: string) => {
+    try {
+      setLoading(true);
+      const res = await apiRegister(email, password);
+      setUser({
+        id: res.user.id,
+        email: res.user.email,
+        is_guest: false,
+        workspace_type: 'personal'
+      });
+      setWorkspaceMode('personal');
+      setActiveWorkspaceContext('personal');
+      await loadAll();
+    } catch (e) {
+      console.error('Registration error:', e);
+      throw e;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      setLoading(true);
+      await apiLogout();
+      setUser(null);
+      setWorkspaceMode('demo');
+      setActiveWorkspaceContext('demo');
+      await loadAll();
+    } catch (e) {
+      console.error('Logout error:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteCurrentWorkspace = async () => {
+    if (window.confirm('Are you sure you want to permanently delete your private workspace and all associated statement records? This cannot be undone.')) {
+      try {
+        setLoading(true);
+        await apiDeleteWorkspace();
+        setUser(null);
+        setWorkspaceMode('demo');
+        setActiveWorkspaceContext('demo');
+        await loadAll();
+      } catch (e) {
+        console.error('Delete workspace error:', e);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const handleToneChange = async (tone: 'playful' | 'dry' | 'minimal') => {
     try {
       await updateTone(tone);
@@ -122,13 +277,21 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const handleSwitchContext = async (targetContext: 'personal' | 'demo') => {
     try {
-      // Clear data partition immediately to avoid stale cross-context state
       setLoading(true);
       setSummary(null);
       setNotifications([]);
       setHabits([]);
       setQuestions([]);
       setLoadErrors({});
+
+      if (targetContext === 'personal' && !getStoredToken()) {
+        // If switching to personal without an existing session, auto-provision guest workspace
+        await startGuestWorkspace();
+        return;
+      }
+
+      setWorkspaceMode(targetContext);
+      setActiveWorkspaceContext(targetContext);
       await switchContext(targetContext);
       await loadAll();
     } catch (e) {
@@ -145,6 +308,8 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setNotifications([]);
       setHabits([]);
       setQuestions([]);
+      setWorkspaceMode('demo');
+      setActiveWorkspaceContext('demo');
       await seedDemoData();
       await loadAll();
     } catch (e) {
@@ -155,7 +320,7 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const handleClearData = async () => {
-    if (window.confirm('Are you sure you want to delete all transactions and habits from local storage?')) {
+    if (window.confirm('Are you sure you want to clear transactions and habits in your current workspace?')) {
       try {
         setLoading(true);
         setSummary(null);
@@ -187,13 +352,22 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         loadErrors,
         isImportOpen,
         isDemoLoading,
+        user,
+        workspaceMode,
+        isAuthModalOpen,
+        setIsAuthModalOpen,
         setIsImportOpen,
         loadAll,
         handleToneChange,
         handleSwitchContext,
         handleLoadDemo,
         handleClearData,
-        handleImportSuccess
+        handleImportSuccess,
+        startGuestWorkspace,
+        login,
+        register,
+        logout,
+        deleteCurrentWorkspace
       }}
     >
       {children}

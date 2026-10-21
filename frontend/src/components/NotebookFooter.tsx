@@ -288,7 +288,7 @@ export const NotebookFooter: React.FC = () => {
                     className="text-[#365844] hover:text-[#243B2E] hover:underline underline-offset-4 decoration-[#DFD9CA] cursor-pointer inline-flex items-center gap-1 transition-colors btn-tactile focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844] rounded-sm"
                   >
                     <UploadCloud className="w-3 h-3" />
-                    <span>{isPublicDemo ? 'Demo Intake Info' : 'Import Statement'}</span>
+                    <span>Import Statement</span>
                   </button>
                 </li>
               </ul>
@@ -298,12 +298,10 @@ export const NotebookFooter: React.FC = () => {
             <div className="footer-column-item space-y-2 max-w-xs text-center sm:text-left bg-[#FCFBF7] p-3.5 rounded-xl border border-[#DFD9CA] shadow-2xs hover:border-[#BFB9AA] transition-colors">
               <div className="flex items-center justify-center sm:justify-start gap-1.5 font-mono text-[11px] text-[#365844] font-medium">
                 <ShieldCheck className="w-3.5 h-3.5 text-[#365844]" />
-                <span>{isPublicDemo ? 'Public Demo (Synthetic)' : 'Local SQLite Security'}</span>
+                <span>Private Workspace Isolation</span>
               </div>
               <p className="text-[11px] text-[#8A928A] leading-relaxed font-sans">
-                {isPublicDemo
-                  ? 'This hosted showcase serves read-only synthetic transactions. For private personal finance analysis with SQLite privacy, run Usually locally.'
-                  : 'Your bank statements and personal transactions never leave this machine. All parsing, accounting, and habit memory run strictly on local hardware.'}
+                Every user workspace runs in its own segregated SQLite database. Statements and habit memory remain private to your session. For permanent offline storage, run Usually locally.
               </p>
             </div>
           </div>

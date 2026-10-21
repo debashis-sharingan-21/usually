@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
-from app.config import is_public_demo, get_deployment_mode
-from app.guards import verify_write_permission
+from app.config import is_public_demo, get_deployment_mode, is_hosted_mode
+from app.workspace import get_current_workspace, require_personal_workspace, WorkspaceContext
 from app.database import get_connection, get_active_context, set_active_context
 from app.services.accounting import calculate_spending_summary
 from app.services.ai_generator import check_ollama_status
@@ -10,8 +10,10 @@ from app.models.schema import SpendingSummaryResponse, SystemHealthResponse, Use
 router = APIRouter(prefix="/api", tags=["System & Accounting"])
 
 @router.get("/accounting/summary", response_model=SpendingSummaryResponse)
-def get_accounting_summary():
-    conn = get_connection()
+def get_accounting_summary(
+    workspace: WorkspaceContext = Depends(get_current_workspace)
+):
+    conn = get_connection(workspace=workspace)
     try:
         summary = calculate_spending_summary(conn)
         return summary
@@ -19,9 +21,10 @@ def get_accounting_summary():
         conn.close()
 
 @router.get("/system/health", response_model=SystemHealthResponse)
-def get_health():
-    active_ctx = get_active_context()
-    conn = get_connection()
+def get_health(
+    workspace: WorkspaceContext = Depends(get_current_workspace)
+):
+    conn = get_connection(workspace=workspace)
     try:
         cur = conn.cursor()
         cur.execute("SELECT COUNT(*) FROM transactions")
@@ -30,7 +33,7 @@ def get_health():
         cur.execute("SELECT COUNT(*) FROM import_batches")
         batch_count = cur.fetchone()[0]
 
-        is_demo = (active_ctx == "demo")
+        is_demo = (workspace.workspace_type == "demo")
 
         # Pending one-tap questions count in active context
         cur.execute("SELECT COUNT(*) FROM payee_questions WHERE status = 'pending'")
@@ -43,11 +46,13 @@ def get_health():
 
         ollama_ok, model_name = check_ollama_status()
 
-        # Check if personal data exists (strictly forbidden and bypassed in public demo mode)
+        # Check if personal data exists
         has_personal = False
-        if not is_public_demo():
+        if workspace.workspace_type == "personal":
+            has_personal = tx_count > 0
+        elif not is_hosted_mode() and not is_public_demo():
             try:
-                p_conn = get_connection("personal")
+                p_conn = get_connection(context="personal")
                 p_cur = p_conn.cursor()
                 p_cur.execute("SELECT COUNT(*) FROM transactions")
                 has_personal = p_cur.fetchone()[0] > 0
@@ -65,7 +70,7 @@ def get_health():
             is_demo_mode=is_demo,
             pending_questions_count=pending_q,
             current_tone=tone_val,
-            active_context=active_ctx,
+            active_context=workspace.workspace_type,
             has_personal_data=has_personal,
             deployment_mode=get_deployment_mode()
         )
@@ -73,23 +78,41 @@ def get_health():
         conn.close()
 
 @router.get("/system/context")
-def get_context():
-    return {"active_context": get_active_context()}
+def get_context(
+    workspace: WorkspaceContext = Depends(get_current_workspace)
+):
+    return {
+        "active_context": workspace.workspace_type,
+        "user_id": workspace.user_id,
+        "is_guest": workspace.is_guest
+    }
 
-@router.post("/system/context", dependencies=[Depends(verify_write_permission)])
-def switch_context(payload: dict):
+@router.post("/system/context")
+def switch_context(
+    payload: dict,
+    workspace: WorkspaceContext = Depends(get_current_workspace)
+):
+    if is_public_demo() and not workspace.is_authenticated:
+        raise HTTPException(
+            status_code=403,
+            detail="Mutations are disabled in public demo mode. Run Usually locally for private data and statement imports."
+        )
     target_context = payload.get("context", "personal")
     if target_context not in ("personal", "demo"):
         raise HTTPException(status_code=400, detail="Context must be 'personal' or 'demo'")
-    set_active_context(target_context)
+    if not is_hosted_mode() and not is_public_demo():
+        set_active_context(target_context)
     return {"status": "success", "active_context": target_context}
 
-@router.put("/system/tone", dependencies=[Depends(verify_write_permission)])
-def update_tone(payload: UserSettingsUpdate):
+@router.put("/system/tone")
+def update_tone(
+    payload: UserSettingsUpdate,
+    workspace: WorkspaceContext = Depends(require_personal_workspace)
+):
     if payload.tone not in ("playful", "dry", "minimal"):
         raise HTTPException(status_code=400, detail="Tone must be 'playful', 'dry', or 'minimal'")
 
-    conn = get_connection()
+    conn = get_connection(workspace=workspace)
     try:
         with conn:
             conn.execute("""
@@ -101,9 +124,13 @@ def update_tone(payload: UserSettingsUpdate):
     finally:
         conn.close()
 
-@router.post("/system/seed-demo", dependencies=[Depends(verify_write_permission)])
-def seed_demo_data():
-    conn = get_connection("demo")
+@router.post("/system/seed-demo")
+def seed_demo_data(
+    workspace: WorkspaceContext = Depends(get_current_workspace)
+):
+    if is_public_demo() or is_hosted_mode():
+        raise HTTPException(status_code=403, detail="Direct demo seeding is disabled in hosted mode.")
+    conn = get_connection(context="demo")
     try:
         count = load_realistic_demo_dataset(conn)
         set_active_context("demo")
@@ -111,10 +138,11 @@ def seed_demo_data():
     finally:
         conn.close()
 
-@router.post("/system/clear-data", dependencies=[Depends(verify_write_permission)])
-def clear_all_data():
-    active_ctx = get_active_context()
-    conn = get_connection(active_ctx)
+@router.post("/system/clear-data")
+def clear_all_data(
+    workspace: WorkspaceContext = Depends(require_personal_workspace)
+):
+    conn = get_connection(workspace=workspace)
     try:
         with conn:
             conn.execute("DELETE FROM transactions")
@@ -122,8 +150,6 @@ def clear_all_data():
             conn.execute("DELETE FROM habit_feedback")
             conn.execute("DELETE FROM learned_payees")
             conn.execute("DELETE FROM payee_questions")
-        if active_ctx == "demo":
-            set_active_context("personal")
-        return {"status": "success", "message": f"All data cleared successfully for {active_ctx} context."}
+        return {"status": "success", "message": f"All data cleared successfully for {workspace.workspace_type} workspace."}
     finally:
         conn.close()

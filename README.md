@@ -3,26 +3,42 @@
 > A quiet, local-first personal finance AI companion designed with a warm, editorial notebook aesthetic.
 > Themed **“Slow and Steady”** with a peaceful sloth identity.
 
-Usually is **not** a generic expense tracker or a conversational budgeting bot. It observes verified recurring rhythms in your transaction ledger (e.g., dining surges, commute patterns, subscription cadences) and turns them into concise, evidence-backed observations at your own pace.
+Usually is **not** a generic expense tracker or an annoying budgeting bot. It observes verified recurring rhythms in your transaction ledger (e.g., dining surges, commute patterns, subscription cadences) and turns them into concise, evidence-backed observations at your own pace.
 
 ---
 
 ## Two Ways to Experience Usually
 
-Usually is designed with a strict distinction between **Local Private Use** and the **Public Hosted Demo**:
+Usually is designed with a strict, multi-tenant architecture that lets users freely explore the product:
 
-| Feature / Capability | Local Development (Private Use) | Public Hosted Demo (Railway + Vercel) |
+| Feature / Capability | Synthetic Showcase Demo | Personal Private Workspace |
 | :--- | :--- | :--- |
-| **Data Source** | Personal bank & UPI CSV statements | Synthetic 6-month demonstration dataset |
-| **Database Storage** | Local SQLite (`backend/data/usually.db`) | Persistent demo volume (`/data/usually_demo.db`) |
-| **Privacy Isolation** | 100% on your machine (zero data leaves device) | Multi-layered server guard; personal DB prohibited |
-| **CSV Import & Mapping** | Enabled (PhonePe, HDFC, SBI, generic CSVs) | Disabled (HTTP 403 Forbidden on server) |
-| **Transaction Editing** | Enabled (change merchant, category, type) | Disabled (HTTP 403 Forbidden on server) |
-| **Habit Feedback** | Enabled (Confirm, Mute, Persistent learning) | Disabled (Read-only showcase) |
-| **AI Engine** | Local Ollama + Gemma 2b or deterministic rules | Offline deterministic fallback engine |
+| **Purpose** | Immediate exploration of Usually's intelligence | Import your own statements & learn personal rhythms |
+| **Data Source** | Realistic 6-month synthetic dataset (82 rows) | Your bank & UPI CSV statements (PhonePe, HDFC, SBI, etc.) |
+| **Database Storage** | Persistent demo SQLite (`usually_demo.db`) | Isolated per-user SQLite (`workspaces/workspace_<user_id>.db`) |
+| **Multi-Tenant Isolation** | Read-only synthetic showcase | Physical database segregation (zero cross-user contamination) |
+| **Mutations & Edits** | Blocked (HTTP 403 Forbidden) | Full access: Import, Reconcile, Edit, Persistent Learning |
+| **Entry Friction** | Zero (instant preview) | 1-Click Instant Guest Workspace or Account Sign In |
+| **Privacy & Deletion** | Shared demonstration data | 1-Click permanent deletion (`DELETE /api/auth/workspace`) |
 
-> [!IMPORTANT]
-> **The Public Demo is NOT a multi-user service:** It intentionally serves synthetic data in read-only mode to demonstrate Usually's habit engine and accounting invariants without collecting, aggregating, or persisting any visitor financial data.
+---
+
+## Multi-Tenant Physical SQLite Isolation
+
+Usually uses **per-user SQLite database files** rather than multi-tenant row flags:
+1. **Mathematical Isolation Guarantee:** User A's SQLite connection physically cannot query User B's file. SQL injection or misconfigured `WHERE user_id = ?` query bugs are physically impossible.
+2. **Deterministic Financial Invariants:** Every user workspace runs the exact same double-entry accounting engine (`accounting.py`) and longitudinal habit detector (`habit_engine.py`) without modifying underlying ledger queries.
+3. **Atomic Workspace Deletion:** When a user requests data deletion, Usually physically removes `workspace_<user_id>.db`, `-wal`, and `-shm` files from disk, leaving zero residual transaction traces.
+4. **Session Authentication:** Authenticated via standard PBKDF2-HMAC-SHA256 hashed credentials or cryptographically random bearer session tokens (`secrets.token_urlsafe(32)`). Client-supplied user IDs are never trusted.
+
+---
+
+## Storage Transparency & Hosted Cloud Considerations
+
+- **Local Self-Hosting:** When running Usually locally on your computer, your transactions are stored in local SQLite databases on your hard drive. Zero data is transmitted to external servers.
+- **Hosted Cloud Instances (Railway / Render):**
+  - **Persistent Volumes:** For persistent hosted multi-user workspaces, mount a persistent disk volume to `/data` (e.g. Railway Volume or Render Disk).
+  - **Ephemeral Disk Reality:** On free-tier cloud containers without persistent volumes, instance restarts or spin-downs reset disk state. Hosted guest workspaces persist for the duration of the active container session. Usually explicitly discloses this in the application UI.
 
 ---
 
@@ -79,7 +95,7 @@ Open `http://localhost:3000` in your browser. All parsing, local SQLite storage,
 
 ---
 
-## Public Demo Deployment Guide
+## Deployment Configuration
 
 ### A. Railway (Backend Deployment)
 
@@ -92,15 +108,16 @@ The backend runs as a containerized FastAPI application with an attached persist
 3. **Attach Persistent Storage Volume:**
    - Add a Volume to the backend service.
    - Set the mount path to: `/data`
-   - *This ensures the synthetic demo SQLite database (`/data/usually_demo.db`) persists across deployments.*
+   - *This ensures both the synthetic demo SQLite database (`/data/usually_demo.db`) and user workspaces (`/data/workspaces/`) persist across deployments.*
 4. **Environment Variables:**
-   - `USUALLY_DEPLOYMENT_MODE`: `public_demo`
+   - `USUALLY_DEPLOYMENT_MODE`: `hosted`
    - `USUALLY_DEMO_DB_PATH`: `/data/usually_demo.db`
+   - `USUALLY_DATA_DIR`: `/data`
    - `USUALLY_ALLOWED_ORIGINS`: `https://your-app.vercel.app` (your Vercel frontend URL)
-   - `PORT`: `8000` (Railway automatically assigns the external port)
+   - `PORT`: `8000`
 5. **Healthcheck Endpoint:**
    - Healthcheck Path: `/health`
-   - Returns: `{"status": "ok", "deployment_mode": "public_demo", "database": "connected"}`
+   - Returns: `{"status": "ok", "deployment_mode": "hosted", "database": "connected"}`
 
 ---
 
@@ -114,22 +131,13 @@ The Next.js App Router frontend deploys to Vercel and forwards `/api/*` requests
    - **Root Directory:** `frontend`
 3. **Environment Variables:**
    - `USUALLY_API_URL`: Your Railway backend domain (e.g. `https://usually-production.up.railway.app`)
-   - `NEXT_PUBLIC_USUALLY_PUBLIC_DEMO`: `true`
 4. **Deploy:** Click **Deploy**. Vercel will build the frontend with Turbopack and proxy all `/api/*` traffic cleanly to your Railway backend.
-5. **Redeploy Reminder:** If you update the Railway backend URL, update `USUALLY_API_URL` in Vercel Project Settings and trigger a redeploy.
-
----
-
-## SQLite Constraints & Single-Instance Architecture
-
-- **Single Process Constraint:** SQLite is an embedded database that operates via local file locks (`WAL` mode). In cloud deployments like Railway, run **1 replica** of the backend service to prevent split-brain database locks.
-- **Backups:** Because the persistent volume is mounted at `/data`, snapshot backups can be taken directly from the Railway volume dashboard.
 
 ---
 
 ## Automated Test Suite
 
-Usually maintains a test suite of **73 automated regression tests** covering accounting logic, CSV parsing, habit detection, database isolation, and public demo security.
+Usually maintains a test suite of **79 automated regression tests** covering accounting logic, CSV parsing, habit detection, database isolation, multi-tenant security, and user deletion.
 
 ```bash
 # Run the entire test suite:
@@ -137,7 +145,8 @@ pytest backend/tests/ -v
 ```
 
 ### Key Test Suites:
-- `test_public_demo.py` (12 tests): Demonstrates server-side read-only enforcement, public demo context pinning, personal database prohibition, idempotent synthetic seeding, and HTTP 403 rejection of all mutations.
+- `test_user_isolation.py` (6 tests): Demonstrates physical multi-tenant isolation, cross-tenant mutation denial (HTTP 404), demo read-only enforcement (HTTP 403), user registration/login session lifecycle, and atomic workspace deletion.
+- `test_public_demo.py` (12 tests): Demonstrates server-side read-only enforcement, public demo context pinning, personal database prohibition, idempotent synthetic seeding, and HTTP 403 rejection of all unauthenticated mutations.
 - `test_financial_invariants.py` (16 tests): Validates mathematical purity, non-negative amounts, authoritative balance identity, and delimiter resilience.
 - `test_database_isolation.py`: Guarantees physical segregation between demo and personal SQLite files.
 - `test_csv_importer.py` & `test_phonepe_2026_parsing.py`: Verifies resilient parsing across standard CSV, TSV, semicolon, and PhonePe statement structures.

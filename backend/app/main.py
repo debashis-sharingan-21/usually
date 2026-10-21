@@ -9,6 +9,7 @@ from app.routes.habits import router as habits_router
 from app.routes.notifications import router as notifications_router
 from app.routes.system import router as system_router
 from app.routes.learning import router as learning_router
+from app.routes.auth import router as auth_router
 
 logger = logging.getLogger("usually")
 
@@ -45,6 +46,7 @@ app.include_router(habits_router)
 app.include_router(notifications_router)
 app.include_router(system_router)
 app.include_router(learning_router)
+app.include_router(auth_router)
 
 @app.get("/")
 def root():

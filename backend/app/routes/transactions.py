@@ -1,19 +1,27 @@
 import uuid
+import json
 from typing import Optional, List
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Depends
+from app.config import is_public_demo, is_hosted_mode, get_personal_db_path
 from app.database import get_connection, set_active_context
-from app.guards import verify_write_permission
+from app.workspace import get_current_workspace, require_personal_workspace, WorkspaceContext
 from app.services.csv_importer import parse_and_preview_csv, execute_import
 from app.models.schema import CSVPreviewResponse, CSVImportResult, TransactionUpdate
-import json
 
 router = APIRouter(prefix="/api/transactions", tags=["Transactions"])
 
-@router.post("/preview", response_model=CSVPreviewResponse, dependencies=[Depends(verify_write_permission)])
+@router.post("/preview", response_model=CSVPreviewResponse)
 async def preview_csv(
     file: UploadFile = File(...),
-    mapping: Optional[str] = Form(None)
+    mapping: Optional[str] = Form(None),
+    workspace: WorkspaceContext = Depends(get_current_workspace)
 ):
+    if is_public_demo() and not workspace.is_authenticated:
+        raise HTTPException(
+            status_code=403,
+            detail="Mutations are disabled in public demo mode. Run Usually locally for private data and statement imports."
+        )
+
     try:
         content_bytes = await file.read()
         content = content_bytes.decode("utf-8", errors="replace")
@@ -35,11 +43,12 @@ async def preview_csv(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to parse CSV statement: {str(e)}")
 
-@router.post("/import", response_model=CSVImportResult, dependencies=[Depends(verify_write_permission)])
+@router.post("/import", response_model=CSVImportResult)
 async def import_csv(
     file: UploadFile = File(...),
     mapping: str = Form(...),
-    currency: str = Form("INR")
+    currency: str = Form("INR"),
+    workspace: WorkspaceContext = Depends(require_personal_workspace)
 ):
     try:
         content_bytes = await file.read()
@@ -50,7 +59,15 @@ async def import_csv(
         raise HTTPException(status_code=400, detail=f"Invalid payload or CSV: {str(e)}")
 
     batch_id = f"batch_{uuid.uuid4().hex[:10]}"
-    conn = get_connection("personal")
+    if not is_hosted_mode() and not is_public_demo() and workspace.workspace_type == "demo":
+        workspace = WorkspaceContext(
+            workspace_type="personal",
+            db_path=get_personal_db_path(),
+            is_authenticated=False
+        )
+        set_active_context("personal")
+
+    conn = get_connection(workspace=workspace)
     try:
         result = execute_import(
             conn=conn,
@@ -60,7 +77,6 @@ async def import_csv(
             mapping=col_mapping,
             currency=currency
         )
-        set_active_context("personal")
         return result
     finally:
         conn.close()
@@ -73,9 +89,10 @@ def list_transactions(
     merchant: Optional[str] = None,
     direction: Optional[str] = None,
     tx_type: Optional[str] = None,
-    search: Optional[str] = None
+    search: Optional[str] = None,
+    workspace: WorkspaceContext = Depends(get_current_workspace)
 ):
-    conn = get_connection()
+    conn = get_connection(workspace=workspace)
     try:
         cur = conn.cursor()
         query = "SELECT id, import_batch_id, date, raw_description, clean_merchant, category, amount, direction, type, currency, fingerprint, is_user_modified, created_at FROM transactions WHERE 1=1"
@@ -97,7 +114,6 @@ def list_transactions(
             query += " AND (clean_merchant LIKE ? OR raw_description LIKE ?)"
             params.extend([f"%{search}%", f"%{search}%"])
 
-        # Count total
         count_query = query.replace("SELECT id, import_batch_id, date, raw_description, clean_merchant, category, amount, direction, type, currency, fingerprint, is_user_modified, created_at", "SELECT COUNT(*)")
         cur.execute(count_query, params)
         total_count = cur.fetchone()[0]
@@ -135,9 +151,13 @@ def list_transactions(
     finally:
         conn.close()
 
-@router.put("/{tx_id}", dependencies=[Depends(verify_write_permission)])
-def update_transaction(tx_id: int, payload: TransactionUpdate):
-    conn = get_connection()
+@router.put("/{tx_id}")
+def update_transaction(
+    tx_id: int,
+    payload: TransactionUpdate,
+    workspace: WorkspaceContext = Depends(require_personal_workspace)
+):
+    conn = get_connection(workspace=workspace)
     try:
         cur = conn.cursor()
         updates = []
@@ -172,16 +192,20 @@ def update_transaction(tx_id: int, payload: TransactionUpdate):
     finally:
         conn.close()
 
-@router.delete("", dependencies=[Depends(verify_write_permission)])
-def delete_all_transactions():
-    """Privacy control: permanently removes all imported transactions and batches from local machine."""
-    active_ctx = get_active_context()
-    conn = get_connection(active_ctx)
+@router.delete("")
+def delete_all_transactions(
+    workspace: WorkspaceContext = Depends(require_personal_workspace)
+):
+    """Privacy control: permanently removes all imported transactions and batches from the user's workspace."""
+    conn = get_connection(workspace=workspace)
     try:
         with conn:
             conn.execute("DELETE FROM transactions")
             conn.execute("DELETE FROM import_batches")
             conn.execute("DELETE FROM habit_feedback")
-        return {"status": "success", "message": f"All transactions and batches cleared permanently for {active_ctx} context."}
+        return {
+            "status": "success",
+            "message": f"All transactions and batches cleared permanently for {workspace.workspace_type} workspace."
+        }
     finally:
         conn.close()

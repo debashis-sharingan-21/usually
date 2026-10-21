@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from datetime import datetime
 from app.database import get_connection
-from app.guards import verify_write_permission
+from app.workspace import get_current_workspace, require_personal_workspace, WorkspaceContext
 from app.services.habit_engine import detect_habits
 from app.models.schema import HabitObservation, HabitFeedbackRequest
 from app.services.ai_generator import generate_observation_with_ai
@@ -10,8 +10,11 @@ from app.services.ai_generator import generate_observation_with_ai
 router = APIRouter(prefix="/api/habits", tags=["Habits"])
 
 @router.get("", response_model=List[HabitObservation])
-def get_habits(reference_date: Optional[str] = None):
-    conn = get_connection()
+def get_habits(
+    reference_date: Optional[str] = None,
+    workspace: WorkspaceContext = Depends(get_current_workspace)
+):
+    conn = get_connection(workspace=workspace)
     try:
         detected = detect_habits(conn, reference_date=reference_date)
         results = []
@@ -38,12 +41,15 @@ def get_habits(reference_date: Optional[str] = None):
     finally:
         conn.close()
 
-@router.post("/feedback", dependencies=[Depends(verify_write_permission)])
-def update_habit_feedback(payload: HabitFeedbackRequest):
+@router.post("/feedback")
+def update_habit_feedback(
+    payload: HabitFeedbackRequest,
+    workspace: WorkspaceContext = Depends(require_personal_workspace)
+):
     if payload.status not in ("confirmed", "muted", "active"):
         raise HTTPException(status_code=400, detail="Status must be 'confirmed', 'muted', or 'active'")
 
-    conn = get_connection()
+    conn = get_connection(workspace=workspace)
     try:
         now_iso = datetime.now().isoformat()
         with conn:
