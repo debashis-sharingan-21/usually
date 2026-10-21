@@ -118,11 +118,11 @@ export const NotebookFooter: React.FC = () => {
         {/* Main Footer Scene: Sloth resting on notebook spine + brand copy */}
         <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-8">
           {/* Left: Illustrated Sloth on Branch Scene */}
-          <div className="footer-sloth-scene flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left max-w-lg">
-            {/* Handcrafted Vector Scene */}
+          <div className="footer-sloth-scene flex flex-col sm:flex-row items-center gap-5 sm:gap-6 text-center sm:text-left max-w-xl lg:max-w-2xl">
+            {/* Handcrafted Vector Scene — Scaled ~1.5x with continuous sleeping Z animation */}
             <div
-              className={`shrink-0 w-28 h-24 sm:w-32 sm:h-28 relative transition-all duration-300 ease-out motion-reduce:transform-none cursor-default ${
-                isHovered ? 'scale-104 -translate-y-0.5' : 'scale-100'
+              className={`shrink-0 w-36 h-[126px] sm:w-48 sm:h-[168px] relative transition-all duration-300 ease-out motion-reduce:transform-none cursor-default ${
+                isHovered ? 'scale-103 -translate-y-0.5' : 'scale-100'
               }`}
               aria-label="Illustration of a peaceful sloth resting on a notebook spine branch"
             >
@@ -130,7 +130,7 @@ export const NotebookFooter: React.FC = () => {
                 viewBox="0 0 128 112"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                className="w-full h-full select-none"
+                className="w-full h-full select-none overflow-visible"
               >
                 {/* Background soft ruled notebook lines */}
                 <line x1="10" y1="36" x2="118" y2="36" stroke="#E8E4D8" strokeWidth="1" strokeDasharray="3 3" />
@@ -217,19 +217,20 @@ export const NotebookFooter: React.FC = () => {
                   <path d="M 11 17.5 Q 13 19 15 17.5" stroke="#292D29" strokeWidth="1" strokeLinecap="round" fill="none" />
                 </g>
 
-                {/* Sleepy 'z' marks with subtle upward float on hover */}
+                {/* Sleeping Zs with continuous floating animation */}
                 <g
-                  className="transition-all duration-300 ease-out"
+                  className="footer-sloth-sleep-zs transition-opacity duration-300"
                   style={{
-                    transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
-                    opacity: isHovered ? 0.95 : 0.45,
+                    opacity: isHovered ? 1 : 0.85,
                   }}
                   fill="#365844"
-                  fontSize="8"
                   fontFamily="serif"
+                  fontStyle="italic"
+                  aria-hidden="true"
                 >
-                  <text x="88" y="38" className="select-none">z</text>
-                  <text x="96" y="30" fontSize="10" className="select-none">z</text>
+                  <text x="86" y="39" fontSize="7.5" className="sloth-z sloth-z-1 select-none">z</text>
+                  <text x="93" y="32" fontSize="9" className="sloth-z sloth-z-2 select-none">z</text>
+                  <text x="100" y="25" fontSize="10.5" className="sloth-z sloth-z-3 select-none">z</text>
                 </g>
               </svg>
             </div>
