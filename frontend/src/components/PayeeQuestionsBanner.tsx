@@ -66,7 +66,7 @@ export const PayeeQuestionsBanner: React.FC<PayeeQuestionsBannerProps> = ({ ques
             <span className="text-[10px] uppercase tracking-widest font-mono text-[#8A928A] font-semibold">
               Notebook Note • {questions.length} question{questions.length > 1 ? 's' : ''} left
             </span>
-            <span className="font-handwriting text-sm text-[#365844]">
+            <span className="notebook-annotation text-sm select-none">
               ~ teach usually once, remembered forever
             </span>
           </div>

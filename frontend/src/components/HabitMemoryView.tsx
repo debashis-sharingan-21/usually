@@ -39,6 +39,9 @@ export const HabitMemoryView: React.FC<HabitMemoryViewProps> = ({ habits, onRefr
           Usually records memory slowly and carefully. As you import additional months of statements,
           enduring routines and recurring cadences will be catalogued here.
         </p>
+        <p className="notebook-annotation text-base mt-2 select-none">
+          ~ good habits take time to observe
+        </p>
       </div>
     );
   }
@@ -54,6 +57,9 @@ export const HabitMemoryView: React.FC<HabitMemoryViewProps> = ({ habits, onRefr
             </span>
             <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA]">
               {habits.length} recorded
+            </span>
+            <span className="notebook-annotation text-sm hidden sm:inline ml-2 select-none">
+              ~ patterns that return across months
             </span>
           </div>
           <h2 className="font-serif text-2xl sm:text-3xl font-normal text-[#292D29] tracking-tight mt-1">

@@ -36,13 +36,23 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "DM Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-.font-handwriting {
+.font-handwriting,
+.font-script {
   font-family: "Caveat", "Reenie Beanie", "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+  font-optical-sizing: auto;
 }
 
 .font-mono {
   font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-variant-numeric: tabular-nums;
+}
+
+/* Handwritten Notebook Marginalia Style */
+.notebook-annotation {
+  font-family: "Caveat", "Reenie Beanie", "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+  color: #365844;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
 }
 
 /* Notebook Background Atmosphere */

@@ -313,8 +313,12 @@ export const NotebookFooter: React.FC = () => {
             <span>MIT License</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="font-serif italic text-xs text-[#365844]">
+          <div className="flex items-center gap-3">
+            <span className="notebook-annotation text-sm select-none">
+              teach Usually once, remembered forever
+            </span>
+            <span className="text-[#DFD9CA] hidden sm:inline" aria-hidden="true">•</span>
+            <span className="font-serif italic text-xs text-[#606860]">
               &ldquo;Slow and steady.&rdquo;
             </span>
           </div>

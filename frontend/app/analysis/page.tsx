@@ -137,8 +137,11 @@ export default function AnalysisPage() {
       {/* SECTION 01: Complete Cash Flow Breakdown */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-mono text-xs uppercase tracking-wider text-[#606860] font-semibold flex items-center gap-1.5">
+          <h2 className="font-mono text-xs uppercase tracking-wider text-[#606860] font-semibold flex items-center gap-2">
             <span>01 / Cash Flow Reconciliation</span>
+            <span className="notebook-annotation text-sm normal-case tracking-normal hidden sm:inline select-none">
+              ~ where the money flowed
+            </span>
           </h2>
           <span className="text-[11px] font-mono text-[#8A928A]">
             {summary.transaction_count} verified entries
@@ -245,8 +248,11 @@ export default function AnalysisPage() {
       {pace && (
         <section className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-mono text-xs uppercase tracking-wider text-[#606860] font-semibold">
-              02 / Spending Pace Benchmark
+            <h2 className="font-mono text-xs uppercase tracking-wider text-[#606860] font-semibold flex items-center gap-2">
+              <span>02 / Spending Pace Benchmark</span>
+              <span className="notebook-annotation text-sm normal-case tracking-normal hidden sm:inline select-none">
+                ~ tracking against your baseline
+              </span>
             </h2>
           </div>
 
@@ -394,8 +400,11 @@ export default function AnalysisPage() {
       {/* SECTION 03: Category Breakdown & Merchant Rankings */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-mono text-xs uppercase tracking-wider text-[#606860] font-semibold">
-            03 / Category Allocation & Counterparties
+          <h2 className="font-mono text-xs uppercase tracking-wider text-[#606860] font-semibold flex items-center gap-2">
+            <span>03 / Category Allocation & Counterparties</span>
+            <span className="notebook-annotation text-sm normal-case tracking-normal hidden sm:inline select-none">
+              ~ where the rhythm settled
+            </span>
           </h2>
         </div>
 

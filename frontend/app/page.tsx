@@ -201,7 +201,7 @@ export default function HomePage() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#EEEBDD] border border-[#DFD9CA] text-[11px] font-mono text-[#365844]">
               <span>Hacktoberfest 2026</span>
               <span>•</span>
-              <span>Themed &ldquo;Slow and Steady&rdquo;</span>
+              <span className="notebook-annotation text-sm font-normal text-[#365844] tracking-normal select-none">slow and steady</span>
             </div>
 
             <h1 className="font-serif text-3xl sm:text-5xl font-normal text-[#292D29] tracking-tight leading-tight">
@@ -277,6 +277,9 @@ export default function HomePage() {
                     Historical Statement
                   </span>
                 )}
+                <span className="notebook-annotation text-sm hidden md:inline ml-1 select-none">
+                  ~ noted quietly in your journal
+                </span>
               </div>
               <h1 className="font-serif text-2xl sm:text-3xl font-normal text-[#292D29] tracking-tight mt-1.5">
                 {briefing.greeting}
@@ -417,8 +420,11 @@ export default function HomePage() {
           {/* Secondary Observations (At most 1 or 2, compact) */}
           {briefing.secondaryObservations.length > 0 && (
             <div className="space-y-3">
-              <div className="text-[11px] font-mono uppercase tracking-wider text-[#8A928A]">
-                Also Observed
+              <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#8A928A]">
+                <span>Also Observed</span>
+                <span className="notebook-annotation text-sm normal-case tracking-normal select-none">
+                  secondary rhythms
+                </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {briefing.secondaryObservations.map((obs) => (
