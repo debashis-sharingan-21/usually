@@ -217,3 +217,93 @@ def test_user_registration_login_lifecycle(client):
     me_res2 = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token2}"})
     assert me_res2.status_code == 200
     assert me_res2.json()["user_id"] == user_id
+
+
+def test_authenticated_personal_workspace_editing_persists(client):
+    """Verifies that an authenticated personal user can edit merchants and categories, and updates persist."""
+    res = client.post("/api/auth/guest")
+    assert res.status_code == 200
+    token = res.json()["token"]
+
+    # Import statement
+    client.post(
+        "/api/transactions/import",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("edit_stmt.csv", CSV_DATA_USER_A, "text/csv")},
+        data={"mapping": json.dumps(MAPPING), "currency": "INR"}
+    )
+
+    txs = client.get("/api/transactions", headers={"Authorization": f"Bearer {token}"}).json()["items"]
+    assert len(txs) == 3
+    first_tx = txs[0]
+
+    # Edit merchant and category
+    update_res = client.put(
+        f"/api/transactions/{first_tx['id']}",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"clean_merchant": "Swiggy Gourmet Delivery", "category": "Food & Dining"}
+    )
+    assert update_res.status_code == 200
+
+    # Fetch fresh and verify persistence
+    updated_txs = client.get("/api/transactions", headers={"Authorization": f"Bearer {token}"}).json()["items"]
+    matched = [t for t in updated_txs if t["id"] == first_tx["id"]][0]
+    assert matched["clean_merchant"] == "Swiggy Gourmet Delivery"
+    assert matched["category"] == "Food & Dining"
+    assert matched["is_user_modified"] is True
+
+def test_authenticated_personal_learning_and_feedback(client):
+    """Verifies habit feedback can be submitted and persists in personal workspace."""
+    res = client.post("/api/auth/guest")
+    token = res.json()["token"]
+
+    feedback_res = client.post(
+        "/api/habits/feedback",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"habit_key": "weekday_dining_surge", "status": "confirmed", "notes": "Observed regularly"}
+    )
+    assert feedback_res.status_code == 200
+    assert feedback_res.json()["new_status"] == "confirmed"
+
+def test_hosted_public_demo_mode_allows_authenticated_personal_mutations(client, monkeypatch):
+    """
+    Demonstrates that running in USUALLY_DEPLOYMENT_MODE='public_demo' blocks unauthenticated mutations
+    on the demo database, but fully allows authenticated users to mutate their own personal workspaces.
+    """
+    monkeypatch.setenv("USUALLY_DEPLOYMENT_MODE", "public_demo")
+
+    # 1. Unauthenticated mutation attempt fails with 403
+    unauth_res = client.post(
+        "/api/transactions/import",
+        files={"file": ("stmt.csv", CSV_DATA_USER_A, "text/csv")},
+        data={"mapping": json.dumps(MAPPING), "currency": "INR"}
+    )
+    assert unauth_res.status_code == 403
+
+    # 2. Authenticated user creates a private guest workspace
+    guest_res = client.post("/api/auth/guest")
+    assert guest_res.status_code == 200
+    token = guest_res.json()["token"]
+
+    # 3. Authenticated personal mutation SUCCEEDS even while server is in public_demo mode!
+    auth_import_res = client.post(
+        "/api/transactions/import",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("stmt.csv", CSV_DATA_USER_A, "text/csv")},
+        data={"mapping": json.dumps(MAPPING), "currency": "INR"}
+    )
+    assert auth_import_res.status_code == 200
+    assert auth_import_res.json()["accepted_rows"] == 3
+
+    # 4. Authenticated transaction edit SUCCEEDS
+    txs = client.get("/api/transactions", headers={"Authorization": f"Bearer {token}"}).json()["items"]
+    edit_res = client.put(
+        f"/api/transactions/{txs[0]['id']}",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"clean_merchant": "Updated Under Public Demo Mode"}
+    )
+    assert edit_res.status_code == 200
+
+    # 5. Shared demo dataset remains completely untouched (read-only)
+    demo_txs = client.get("/api/transactions", headers={"Authorization": f"Bearer {token}", "X-Workspace-Context": "demo"}).json()
+    assert all(t["clean_merchant"] != "Updated Under Public Demo Mode" for t in demo_txs["items"])

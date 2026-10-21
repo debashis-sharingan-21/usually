@@ -11,7 +11,6 @@ import {
   TrendingDown,
   ArrowUpRight,
   ArrowDownLeft,
-  Shield,
   Gauge,
   Store,
   PieChart,
@@ -251,57 +250,143 @@ export default function AnalysisPage() {
             </h2>
           </div>
 
-          <div className="analysis-pace-card paper-sheet-interactive p-6 space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-              <div className="flex items-start gap-3.5">
-                <div className="p-2.5 rounded-xl bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA] mt-0.5">
+          <div className="analysis-pace-card paper-sheet-interactive p-5 sm:p-6 space-y-5">
+            {/* Top row: Left description & Right 3-metric group */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              {/* Left-hand descriptive region */}
+              <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                <div className="p-2.5 rounded-xl bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA] shrink-0 mt-0.5">
                   <Gauge className="w-5 h-5" />
                 </div>
-                <div>
+                <div className="space-y-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-serif text-xl font-normal text-[#292D29]">
+                    <h3 className="font-serif text-xl sm:text-2xl font-normal text-[#292D29] tracking-tight">
                       Latest Statement Pace ({pace.month})
                     </h3>
-                    <span className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                    <span className={`text-[10px] font-mono uppercase tracking-wider px-2.5 py-0.5 rounded-full shrink-0 ${
                       pace.status === 'higher'
-                        ? 'bg-[#C85A32]/10 text-[#C85A32] border border-[#C85A32]/30'
+                        ? 'bg-[#C85A32]/10 text-[#C85A32] border border-[#C85A32]/30 font-medium'
                         : pace.status === 'lower'
-                        ? 'bg-[#365844]/10 text-[#365844] border border-[#365844]/30'
+                        ? 'bg-[#365844]/10 text-[#365844] border border-[#365844]/30 font-medium'
                         : 'bg-[#EEEBDD] text-[#606860] border border-[#DFD9CA]'
                     }`}>
                       {pace.status === 'higher' ? 'Pacing Ahead' : pace.status === 'lower' ? 'Disciplined' : 'On Track'}
                     </span>
                   </div>
-                  <p className="text-xs text-[#606860] mt-1 font-sans">
+                  <p className="text-xs text-[#606860] leading-relaxed font-sans max-w-xl">
                     Evaluates cumulative spend through Day {pace.as_of_day} compared to the average of prior statement months up to Day {pace.as_of_day}.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-6 font-mono text-right border-t md:border-t-0 md:border-l border-[#EEEBDD] pt-3 md:pt-0 md:pl-6">
-                <div>
-                  <div className="text-[11px] text-[#8A928A] uppercase">Month Spend</div>
-                  <div className="text-base font-semibold text-[#292D29]">
-                    ₹{pace.current_month_spend.toLocaleString('en-IN')}
+              {/* Right-hand dedicated metric region */}
+              <div className="grid grid-cols-3 gap-3 sm:gap-5 border-t lg:border-t-0 lg:border-l border-[#EEEBDD] pt-4 lg:pt-0 lg:pl-6 shrink-0 lg:min-w-[340px]">
+                {/* Month Spend */}
+                <div className="text-right">
+                  <div className="text-[11px] font-mono uppercase text-[#8A928A] tracking-wider whitespace-nowrap">
+                    Month spend
+                  </div>
+                  <div className="text-lg sm:text-xl font-mono font-semibold text-[#292D29] tabular-nums whitespace-nowrap mt-0.5">
+                    ₹{Number(pace.current_month_spend || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
-                <div>
-                  <div className="text-[11px] text-[#8A928A] uppercase">Baseline Avg</div>
-                  <div className="text-base font-semibold text-[#606860]">
-                    ₹{pace.historical_baseline_pace.toLocaleString('en-IN')}
+
+                {/* Baseline Avg */}
+                <div className="text-right">
+                  <div className="text-[11px] font-mono uppercase text-[#8A928A] tracking-wider whitespace-nowrap">
+                    Baseline avg
+                  </div>
+                  <div className="text-lg sm:text-xl font-mono font-semibold text-[#606860] tabular-nums whitespace-nowrap mt-0.5">
+                    ₹{Number(pace.historical_baseline_pace || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </div>
                 </div>
-                <div>
-                  <div className="text-[11px] text-[#8A928A] uppercase">Variance</div>
-                  <div className={`text-base font-semibold flex items-center justify-end gap-0.5 ${
-                    pace.diff_percentage > 0 ? 'text-[#C85A32]' : 'text-[#365844]'
+
+                {/* Variance */}
+                <div className="text-right">
+                  <div className="text-[11px] font-mono uppercase text-[#8A928A] tracking-wider whitespace-nowrap">
+                    Variance
+                  </div>
+                  <div className={`text-lg sm:text-xl font-mono font-semibold tabular-nums whitespace-nowrap flex items-center justify-end gap-1 mt-0.5 ${
+                    pace.diff_percentage > 0 ? 'text-[#C85A32]' : pace.diff_percentage < 0 ? 'text-[#365844]' : 'text-[#606860]'
                   }`}>
-                    {pace.diff_percentage > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                    {pace.diff_percentage > 0 ? (
+                      <TrendingUp className="w-4 h-4 shrink-0" />
+                    ) : pace.diff_percentage < 0 ? (
+                      <TrendingDown className="w-4 h-4 shrink-0" />
+                    ) : null}
                     <span>{pace.diff_percentage > 0 ? `+${pace.diff_percentage}%` : `${pace.diff_percentage}%`}</span>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* Visual Pace Comparison Sub-panel */}
+            {(() => {
+              const currentSpend = Number(pace.current_month_spend || 0);
+              const baselinePace = Number(pace.historical_baseline_pace || 0);
+              const maxVal = Math.max(currentSpend, baselinePace, 1);
+              const currentPct = Math.min(100, Math.max(0, (currentSpend / maxVal) * 100));
+              const baselinePct = Math.min(100, Math.max(0, (baselinePace / maxVal) * 100));
+              const diffAmount = Math.abs(currentSpend - baselinePace);
+              const isHigher = currentSpend > baselinePace;
+
+              return (
+                <div className="pt-4 border-t border-[#EEEBDD] space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-[#606860] gap-1">
+                    <span className="font-mono uppercase tracking-wider text-[10px] text-[#8A928A] font-medium">
+                      Pace Trajectory (Through Day {pace.as_of_day})
+                    </span>
+                    <span className="font-sans font-medium text-[#292D29]">
+                      {diffAmount === 0 || baselinePace === 0
+                        ? 'Baseline matching'
+                        : isHigher
+                        ? `₹${diffAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })} above historical baseline`
+                        : `₹${diffAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })} below historical baseline`}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 bg-[#F7F5EE] p-3 rounded-xl border border-[#DFD9CA]/70">
+                    {/* Current Month Pace Bar */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="font-mono text-[#292D29] font-medium">Current pace</span>
+                        <span className="font-mono font-semibold text-[#292D29] tabular-nums">
+                          ₹{currentSpend.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-[#EEEBDD] rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            isHigher ? 'bg-[#C85A32]' : 'bg-[#365844]'
+                          }`}
+                          style={{ width: `${currentPct}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Historical Baseline Bar */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px]">
+                        <span className="font-mono text-[#606860]">Historical baseline</span>
+                        <span className="font-mono text-[#606860] tabular-nums">
+                          ₹{baselinePace.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-[#EEEBDD] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#8A928A] rounded-full transition-all duration-300"
+                          style={{ width: `${baselinePct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] font-sans text-[#8A928A] italic">
+                    * Compares cumulative outflow through Day {pace.as_of_day} against equivalent historical checkpoints. Does not project final end-of-month spend.
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </section>
       )}

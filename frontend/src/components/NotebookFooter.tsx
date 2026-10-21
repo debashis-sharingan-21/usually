@@ -3,14 +3,12 @@
 import React, { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useStatement } from '@/context/StatementContext';
-import { ShieldCheck, UploadCloud, Heart } from 'lucide-react';
+import { ShieldCheck, UploadCloud } from 'lucide-react';
 import gsap from 'gsap';
 import { isReducedMotion, observeViewportReveal } from '@/lib/motion';
-import { isPublicDemoUI } from '@/lib/demo';
 
 export const NotebookFooter: React.FC = () => {
-  const { setIsImportOpen, health } = useStatement();
-  const isPublicDemo = isPublicDemoUI(health?.is_demo_mode, health?.deployment_mode);
+  const { setIsImportOpen } = useStatement();
   const [isHovered, setIsHovered] = useState(false);
   const footerRef = useRef<HTMLElement>(null);
   const hasAnimatedRef = useRef(false);

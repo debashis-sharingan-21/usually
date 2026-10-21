@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import type { PayeeQuestion } from '../types';
-import { HelpCircle, User, Home, Briefcase, ArrowLeftRight, ShoppingBag, Sparkles } from 'lucide-react';
+import { HelpCircle, User, Home, Briefcase, ArrowLeftRight, ShoppingBag } from 'lucide-react';
 import { answerQuestion, dismissQuestion } from '../api/client';
-import { isPublicDemoUI } from '@/lib/demo';
+import { useStatement } from '@/context/StatementContext';
 
 interface PayeeQuestionsBannerProps {
   questions: PayeeQuestion[];
@@ -10,9 +10,10 @@ interface PayeeQuestionsBannerProps {
 }
 
 export const PayeeQuestionsBanner: React.FC<PayeeQuestionsBannerProps> = ({ questions, onAnswered }) => {
+  const { isReadOnly } = useStatement();
   const [submittingId, setSubmittingId] = useState<string | null>(null);
 
-  if (questions.length === 0 || isPublicDemoUI()) return null;
+  if (questions.length === 0 || isReadOnly) return null;
 
   const currentQ = questions[0];
 

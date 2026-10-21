@@ -20,7 +20,6 @@ import { previewCSV, importCSV } from '../api/client';
 import type { CSVPreviewResponse, CSVImportResult } from '../types';
 import { SlothMascot } from './SlothMascot';
 import { useStatement } from '@/context/StatementContext';
-import { isPublicDemoUI } from '@/lib/demo';
 
 export type SelectionStatus =
   | 'idle'
@@ -54,7 +53,7 @@ const formatFileSize = (bytes: number): string => {
 };
 
 export const CSVImportModal: React.FC<CSVImportModalProps> = ({ isOpen, onClose, onImportSuccess }) => {
-  const { health, user, workspaceMode, startGuestWorkspace } = useStatement();
+  const { user, workspaceMode, startGuestWorkspace } = useStatement();
   const isDemoContext = workspaceMode === 'demo' && !user;
 
   const [selection, setSelection] = useState<AuthoritativeSelection | null>(null);

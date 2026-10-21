@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import type { Transaction } from '../types';
 import { fetchTransactions, updateTransaction } from '../api/client';
-import { Search, Edit2, Check, X, Tag, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Search, Edit2, Check, X, Tag, ArrowLeft, ArrowRight, AlertCircle } from 'lucide-react';
 import { useStatement } from '@/context/StatementContext';
-import { isPublicDemoUI } from '@/lib/demo';
 
 interface TransactionListProps {
   onTransactionUpdated: () => void;
@@ -23,8 +22,7 @@ const CATEGORIES = [
 ];
 
 export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionUpdated }) => {
-  const { health } = useStatement();
-  const isPublicDemo = isPublicDemoUI(health?.is_demo_mode, health?.deployment_mode);
+  const { isReadOnly, isSessionResolved } = useStatement();
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
@@ -36,6 +34,8 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editMerchant, setEditMerchant] = useState('');
   const [editCategory, setEditCategory] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const loadData = async () => {
     try {
@@ -55,9 +55,10 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
 
   useEffect(() => {
     loadData();
-  }, [page, categoryFilter, directionFilter, search]);
+  }, [page, categoryFilter, directionFilter, search, isReadOnly]);
 
   const startEdit = (t: Transaction) => {
+    setEditError(null);
     setEditingId(t.id);
     setEditMerchant(t.clean_merchant);
     setEditCategory(t.category);
@@ -65,19 +66,26 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
 
   const cancelEdit = () => {
     setEditingId(null);
+    setEditError(null);
   };
 
   const saveEdit = async (id: number) => {
+    setIsSaving(true);
+    setEditError(null);
     try {
       await updateTransaction(id, {
-        clean_merchant: editMerchant,
-        category: editCategory,
+        clean_merchant: editMerchant.trim() || undefined,
+        category: editCategory || undefined,
       });
       setEditingId(null);
-      loadData();
+      await loadData();
       onTransactionUpdated();
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to update transaction';
+      setEditError(`Failed to save changes: ${msg}`);
+      console.error('Update transaction error:', e);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -101,9 +109,27 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
           </h2>
         </div>
         <p className="text-xs text-[#8A928A] max-w-xs sm:text-right font-sans">
-          Click the pen icon on any transaction to edit the merchant or category instantly.
+          {isReadOnly && isSessionResolved
+            ? 'Viewing synthetic records in read-only mode.'
+            : 'Click the pen icon on any transaction to edit the merchant or category instantly.'}
         </p>
       </div>
+
+      {editError && (
+        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center justify-between font-mono animate-fade-in">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+            <span>{editError}</span>
+          </div>
+          <button
+            onClick={() => setEditError(null)}
+            className="p-1 hover:text-rose-900 cursor-pointer rounded"
+            aria-label="Dismiss error"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       <div className="p-5 sm:p-6 rounded-2xl bg-[#FCFBF7] border border-[#DFD9CA] shadow-sm space-y-4">
         {/* Filters bar */}
@@ -139,190 +165,224 @@ export const TransactionList: React.FC<TransactionListProps> = ({ onTransactionU
               className="py-1.5 px-3 bg-[#F7F5EE] border border-[#DFD9CA] rounded-lg text-xs text-[#292D29] focus:outline-none focus:border-[#365844] focus:ring-2 focus:ring-[#365844]/20 transition-all font-sans cursor-pointer"
             >
               <option value="">All Categories</option>
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
+
+            {(search || categoryFilter || directionFilter) && (
+              <button
+                onClick={() => { setSearch(''); setCategoryFilter(''); setDirectionFilter(''); setPage(0); }}
+                className="text-xs text-[#8A928A] hover:text-[#292D29] underline px-2 py-1 font-sans cursor-pointer"
+              >
+                Reset filters
+              </button>
+            )}
           </div>
 
-          <div className="text-xs text-[#8A928A] font-mono">
-            Showing {total === 0 ? 0 : page * limit + 1}–{Math.min((page + 1) * limit, total)} of {total}
+          <div className="text-xs font-mono text-[#8A928A] flex items-center gap-2">
+            <span>Showing {transactions.length} of {total}</span>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="border border-[#DFD9CA] rounded-xl overflow-hidden bg-[#FCFBF7]">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#EEEBDD] text-[#606860] uppercase tracking-wider text-[10px] font-mono border-b border-[#DFD9CA]">
+        {/* Ledger Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-[#EEEBDD]">
+                <th className="py-2.5 px-4 font-mono font-medium text-[#8A928A]">DATE</th>
+                <th className="py-2.5 px-4 font-mono font-medium text-[#8A928A]">FLOW</th>
+                <th className="py-2.5 px-4 font-mono font-medium text-[#8A928A]">COUNTERPARTY / MEMO</th>
+                <th className="py-2.5 px-4 font-mono font-medium text-[#8A928A]">CATEGORY</th>
+                <th className="py-2.5 px-4 font-mono font-medium text-right text-[#8A928A]">AMOUNT</th>
+                <th className="py-2.5 px-4 font-mono font-medium text-[#8A928A]">TYPE</th>
+                <th className="py-2.5 px-4 font-mono font-medium text-[#8A928A]">FINGERPRINT</th>
+                <th className="py-2.5 px-4 font-mono font-medium text-right text-[#8A928A]">
+                  {isReadOnly && isSessionResolved ? 'STATUS' : 'EDIT'}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#EEEBDD]/60 font-sans">
+              {transactions.length === 0 ? (
                 <tr>
-                  <th className="py-2.5 px-4 font-medium">Date</th>
-                  <th className="py-2.5 px-4 font-medium">Flow</th>
-                  <th className="py-2.5 px-4 font-medium">Merchant / Payee</th>
-                  <th className="py-2.5 px-4 font-medium">Category</th>
-                  <th className="py-2.5 px-4 text-right font-medium">Amount</th>
-                  <th className="py-2.5 px-4 font-medium">Type</th>
-                  <th className="py-2.5 px-4 font-medium">Fingerprint</th>
-                  <th className="py-2.5 px-4 text-right font-medium">Edit</th>
+                  <td colSpan={8} className="py-8 text-center text-[#8A928A] font-sans">
+                    No transactions match your current filters.
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EEEBDD]">
-                {transactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-10 text-center text-[#8A928A] font-sans">
-                      No transactions match the selected filter.
-                    </td>
-                  </tr>
-                ) : (
-                  transactions.map((t) => {
-                    const isEditing = editingId === t.id;
+              ) : (
+                transactions.map((t) => {
+                  const isEditing = editingId === t.id;
 
-                    return (
-                      <tr key={t.id} className="hover:bg-[#F7F5EE]/70 transition-colors duration-150">
-                        <td className="py-3 px-4 font-mono text-[#606860] whitespace-nowrap">
-                          {t.date}
-                        </td>
+                  return (
+                    <tr
+                      key={t.id}
+                      className={`hover:bg-[#F7F5EE]/80 transition-colors ${
+                        isEditing ? 'bg-[#F7F5EE]' : ''
+                      }`}
+                    >
+                      <td className="py-3 px-4 font-mono text-[#606860] whitespace-nowrap">
+                        {t.date}
+                      </td>
 
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase tracking-wider ${
-                            t.direction === 'credit'
-                              ? 'bg-[#365844]/10 text-[#365844] border border-[#365844]/20'
-                              : 'bg-[#C85A32]/10 text-[#C85A32] border border-[#C85A32]/20'
-                          }`}>
-                            {t.direction}
-                          </span>
-                        </td>
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center text-[10px] font-mono px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                          t.direction === 'credit'
+                            ? 'bg-[#365844]/10 text-[#365844] border border-[#365844]/20'
+                            : 'bg-[#C85A32]/10 text-[#C85A32] border border-[#C85A32]/20'
+                        }`}>
+                          {t.direction}
+                        </span>
+                      </td>
 
-                        <td className="py-3 px-4 text-[#292D29] max-w-xs">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={editMerchant}
-                              onChange={(e) => setEditMerchant(e.target.value)}
-                              className="bg-[#F7F5EE] border border-[#365844] rounded px-2 py-0.5 text-xs text-[#292D29] w-full focus:outline-none"
-                            />
-                          ) : (
-                            <div>
-                              <div className="flex items-center gap-1.5 font-medium text-sm">
-                                <span>{t.clean_merchant}</span>
-                                {t.is_user_modified && (
-                                  <span className="text-[9px] px-1 rounded bg-[#365844]/10 text-[#365844] border border-[#365844]/20 font-mono">
-                                    edited
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[11px] text-[#8A928A] truncate font-normal">
-                                {t.raw_description}
-                              </div>
+                      <td className="py-3 px-4 text-[#292D29] max-w-xs">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editMerchant}
+                            onChange={(e) => setEditMerchant(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveEdit(t.id);
+                              if (e.key === 'Escape') cancelEdit();
+                            }}
+                            autoFocus
+                            className="bg-[#FCFBF7] border border-[#365844] rounded px-2 py-1 text-xs text-[#292D29] w-full focus:outline-none focus:ring-1 focus:ring-[#365844]"
+                          />
+                        ) : (
+                          <div>
+                            <div className="flex items-center gap-1.5 font-medium text-sm">
+                              <span>{t.clean_merchant}</span>
+                              {t.is_user_modified && (
+                                <span className="text-[9px] px-1 rounded bg-[#365844]/10 text-[#365844] border border-[#365844]/20 font-mono">
+                                  edited
+                                </span>
+                              )}
                             </div>
-                          )}
-                        </td>
-
-                        <td className="py-3 px-4">
-                          {isEditing ? (
-                            <select
-                              value={editCategory}
-                              onChange={(e) => setEditCategory(e.target.value)}
-                              className="bg-[#F7F5EE] border border-[#365844] rounded px-2 py-0.5 text-xs text-[#292D29] focus:outline-none"
-                            >
-                              {CATEGORIES.map((cat) => (
-                                <option key={cat} value={cat}>{cat}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[#EEEBDD] text-[#606860] border border-[#DFD9CA]">
-                              <Tag className="w-2.5 h-2.5 text-[#8A928A]" />
-                              <span>{t.category}</span>
-                            </span>
-                          )}
-                        </td>
-
-                        <td className="py-3 px-4 text-right font-mono font-semibold whitespace-nowrap text-sm">
-                          <span className={
-                            t.direction === 'credit' ? 'text-[#365844]' : 'text-[#292D29]'
-                          }>
-                            {t.direction === 'credit' ? '+' : '-'}₹{t.amount.toFixed(2)}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4 whitespace-nowrap">
-                          <span className="capitalize px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#EEEBDD] text-[#606860]">
-                            {t.type}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4 font-mono text-[10px] text-[#8A928A] whitespace-nowrap">
-                          <span title={`Fingerprint SHA-256: ${t.fingerprint}`}>
-                            {t.fingerprint.slice(0, 10)}...
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          {isEditing ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => saveEdit(t.id)}
-                                className="p-1 text-[#365844] hover:bg-[#365844]/10 rounded cursor-pointer btn-tactile focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
-                                title="Save changes"
-                              >
-                                <Check className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={cancelEdit}
-                                className="p-1 text-[#8A928A] hover:bg-[#EEEBDD] rounded cursor-pointer btn-tactile focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
-                                title="Cancel"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
+                            <div className="text-[11px] text-[#8A928A] truncate font-normal">
+                              {t.raw_description}
                             </div>
-                          ) : !isPublicDemo ? (
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-4">
+                        {isEditing ? (
+                          <select
+                            value={editCategory}
+                            onChange={(e) => setEditCategory(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') saveEdit(t.id);
+                              if (e.key === 'Escape') cancelEdit();
+                            }}
+                            className="bg-[#FCFBF7] border border-[#365844] rounded px-2 py-1 text-xs text-[#292D29] focus:outline-none focus:ring-1 focus:ring-[#365844]"
+                          >
+                            {CATEGORIES.map((cat) => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[#EEEBDD] text-[#606860] border border-[#DFD9CA]">
+                            <Tag className="w-2.5 h-2.5 text-[#8A928A]" />
+                            <span>{t.category}</span>
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-4 text-right font-mono font-semibold whitespace-nowrap text-sm">
+                        <span className={
+                          t.direction === 'credit' ? 'text-[#365844]' : 'text-[#292D29]'
+                        }>
+                          {t.direction === 'credit' ? '+' : '-'}₹{t.amount.toFixed(2)}
+                        </span>
+                      </td>
+
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <span className="capitalize px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#EEEBDD] text-[#606860]">
+                          {t.type}
+                        </span>
+                      </td>
+
+                      <td className="py-3 px-4 font-mono text-[10px] text-[#8A928A] whitespace-nowrap">
+                        <span title={`Fingerprint SHA-256: ${t.fingerprint}`}>
+                          {t.fingerprint.slice(0, 10)}...
+                        </span>
+                      </td>
+
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                        {isEditing ? (
+                          <div className="flex items-center justify-end gap-1">
                             <button
-                              onClick={() => startEdit(t)}
-                              className="p-1.5 text-[#8A928A] hover:text-[#292D29] rounded-lg hover:bg-[#EEEBDD] transition-colors btn-tactile cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
-                              title="Edit merchant name or category"
+                              onClick={() => saveEdit(t.id)}
+                              disabled={isSaving}
+                              className="p-1.5 text-[#365844] hover:bg-[#365844]/10 rounded-lg cursor-pointer btn-tactile focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
+                              title="Save changes"
+                              aria-label="Save changes"
                             >
-                              <Edit2 className="w-3.5 h-3.5" />
+                              <Check className="w-4 h-4" />
                             </button>
-                          ) : null}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Bar */}
-          {totalPages > 1 && (
-            <div className="px-4 py-3 bg-[#F7F5EE] border-t border-[#DFD9CA] flex items-center justify-between text-xs text-[#606860]">
-              <div className="font-sans">
-                Page {page + 1} of {totalPages}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(p - 1, 0))}
-                  disabled={page === 0}
-                  className="px-2.5 py-1 rounded-lg bg-[#FCFBF7] border border-[#DFD9CA] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEEBDD] text-[#292D29] flex items-center gap-1 cursor-pointer btn-tactile transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
-                >
-                  <ArrowLeft className="w-3 h-3" />
-                  <span>Previous</span>
-                </button>
-                <span className="px-2 font-mono text-[#292D29]">
-                  {page + 1} / {totalPages}
-                </span>
-                <button
-                  onClick={() => setPage((p) => Math.min(p + 1, totalPages - 1))}
-                  disabled={page >= totalPages - 1}
-                  className="px-2.5 py-1 rounded-lg bg-[#FCFBF7] border border-[#DFD9CA] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#EEEBDD] text-[#292D29] flex items-center gap-1 cursor-pointer btn-tactile transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
-                >
-                  <span>Next</span>
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          )}
+                            <button
+                              onClick={cancelEdit}
+                              disabled={isSaving}
+                              className="p-1.5 text-[#8A928A] hover:bg-[#EEEBDD] rounded-lg cursor-pointer btn-tactile focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
+                              title="Cancel"
+                              aria-label="Cancel editing"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : !isSessionResolved ? (
+                          <span className="inline-block w-4 h-4" />
+                        ) : !isReadOnly ? (
+                          <button
+                            onClick={() => startEdit(t)}
+                            className="p-1.5 text-[#8A928A] hover:text-[#292D29] rounded-lg hover:bg-[#EEEBDD] transition-colors btn-tactile cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844]"
+                            title={`Edit transaction: ${t.clean_merchant}`}
+                            aria-label={`Edit ${t.clean_merchant}`}
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <span
+                            className="text-[10px] font-mono text-[#8A928A] px-1.5 py-0.5 rounded bg-[#EEEBDD]/70 border border-[#DFD9CA]/60 select-none cursor-default"
+                            title="Synthetic demo dataset is read-only. Open personal workspace to edit."
+                          >
+                            Read-only
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
+
+        {/* Pagination Bar */}
+        {totalPages > 1 && (
+          <div className="px-4 py-3 bg-[#F7F5EE] border-t border-[#DFD9CA] flex items-center justify-between text-xs text-[#606860]">
+            <div className="font-sans">
+              Page {page + 1} of {totalPages}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={page === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                className="p-1.5 rounded-lg border border-[#DFD9CA] bg-[#FCFBF7] text-[#292D29] hover:bg-[#EEEBDD] disabled:opacity-40 disabled:cursor-not-allowed transition-all btn-tactile cursor-pointer"
+                aria-label="Previous page"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage((p) => p + 1)}
+                className="p-1.5 rounded-lg border border-[#DFD9CA] bg-[#FCFBF7] text-[#292D29] hover:bg-[#EEEBDD] disabled:opacity-40 disabled:cursor-not-allowed transition-all btn-tactile cursor-pointer"
+                aria-label="Next page"
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

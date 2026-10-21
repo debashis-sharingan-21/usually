@@ -21,6 +21,7 @@ import {
   getActiveWorkspaceContext,
   setActiveWorkspaceContext,
 } from '@/api/client';
+import { isReadOnlyWorkspace } from '@/lib/demo';
 import type {
   SystemHealthResponse,
   SpendingSummaryResponse,
@@ -48,6 +49,8 @@ interface StatementContextType {
   isDemoLoading: boolean;
   user: UserState | null;
   workspaceMode: 'personal' | 'demo';
+  isReadOnly: boolean;
+  isSessionResolved: boolean;
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
   setIsImportOpen: (open: boolean) => void;
@@ -79,6 +82,7 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserState | null>(null);
   const [workspaceMode, setWorkspaceMode] = useState<'personal' | 'demo'>('demo');
+  const [isSessionResolved, setIsSessionResolved] = useState(false);
   const isFetchingRef = useRef(false);
 
   // Initialize session and workspace state on client mount
@@ -98,18 +102,30 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               is_guest: me.is_guest,
               workspace_type: me.workspace_type
             });
-            if (storedCtx === 'personal') {
+            if (storedCtx === 'personal' || me.workspace_type === 'personal') {
               setWorkspaceMode('personal');
             }
+          } else {
+            setUser(null);
           }
         } catch {
           // Token expired or invalid
           setUser(null);
         }
+      } else {
+        setUser(null);
       }
+      setIsSessionResolved(true);
     };
     initSession();
   }, []);
+
+  const isReadOnly = isReadOnlyWorkspace({
+    workspaceMode,
+    user,
+    isSessionResolved,
+    deploymentMode: health?.deployment_mode,
+  });
 
   const loadAll = useCallback(async () => {
     if (isFetchingRef.current) return;
@@ -183,6 +199,7 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
       setWorkspaceMode('personal');
       setActiveWorkspaceContext('personal');
+      setIsSessionResolved(true);
       await loadAll();
     } catch (e) {
       console.error('Failed to create guest workspace:', e);
@@ -204,6 +221,7 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
       setWorkspaceMode('personal');
       setActiveWorkspaceContext('personal');
+      setIsSessionResolved(true);
       await loadAll();
     } catch (e) {
       console.error('Login error:', e);
@@ -225,6 +243,7 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
       setWorkspaceMode('personal');
       setActiveWorkspaceContext('personal');
+      setIsSessionResolved(true);
       await loadAll();
     } catch (e) {
       console.error('Registration error:', e);
@@ -241,6 +260,7 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setUser(null);
       setWorkspaceMode('demo');
       setActiveWorkspaceContext('demo');
+      setIsSessionResolved(true);
       await loadAll();
     } catch (e) {
       console.error('Logout error:', e);
@@ -257,6 +277,7 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setUser(null);
         setWorkspaceMode('demo');
         setActiveWorkspaceContext('demo');
+        setIsSessionResolved(true);
         await loadAll();
       } catch (e) {
         console.error('Delete workspace error:', e);
@@ -354,6 +375,8 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isDemoLoading,
         user,
         workspaceMode,
+        isReadOnly,
+        isSessionResolved,
         isAuthModalOpen,
         setIsAuthModalOpen,
         setIsImportOpen,

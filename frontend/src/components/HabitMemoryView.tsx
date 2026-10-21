@@ -1,10 +1,9 @@
 import React from 'react';
 import type { HabitObservation } from '../types';
-import { Brain, Clock, Calendar, Check, VolumeX, Sparkles } from 'lucide-react';
+import { Clock, Calendar, Check, VolumeX } from 'lucide-react';
 import { sendHabitFeedback } from '../api/client';
 import { SlothMascot } from './SlothMascot';
 import { useStatement } from '@/context/StatementContext';
-import { isPublicDemoUI } from '@/lib/demo';
 
 interface HabitMemoryViewProps {
   habits: HabitObservation[];
@@ -12,16 +11,15 @@ interface HabitMemoryViewProps {
 }
 
 export const HabitMemoryView: React.FC<HabitMemoryViewProps> = ({ habits, onRefresh }) => {
-  const { health } = useStatement();
-  const isPublicDemo = isPublicDemoUI(health?.is_demo_mode, health?.deployment_mode);
+  const { isReadOnly, isSessionResolved } = useStatement();
 
   const handleFeedback = async (key: string, status: 'confirmed' | 'muted' | 'active') => {
-    if (isPublicDemo) return;
+    if (isReadOnly) return;
     try {
       await sendHabitFeedback(key, status);
       onRefresh();
     } catch (e) {
-      console.error(e);
+      console.error('Habit feedback error:', e);
     }
   };
 
@@ -126,12 +124,14 @@ export const HabitMemoryView: React.FC<HabitMemoryViewProps> = ({ habits, onRefr
                   </span>
                 </div>
 
-                {!isPublicDemo ? (
+                {!isSessionResolved ? (
+                  <span className="inline-block w-4 h-4" />
+                ) : !isReadOnly ? (
                   <div className="flex items-center gap-2 font-medium">
                     {isMuted ? (
                       <button
                         onClick={() => handleFeedback(h.habit_key, 'active')}
-                        className="text-[#365844] hover:underline cursor-pointer"
+                        className="text-[#365844] hover:underline cursor-pointer btn-tactile focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#365844]"
                       >
                         Unmute
                       </button>
@@ -140,7 +140,7 @@ export const HabitMemoryView: React.FC<HabitMemoryViewProps> = ({ habits, onRefr
                         {!isConfirmed && (
                           <button
                             onClick={() => handleFeedback(h.habit_key, 'confirmed')}
-                            className="flex items-center gap-1 text-[#292D29] hover:text-[#365844] cursor-pointer"
+                            className="flex items-center gap-1 text-[#292D29] hover:text-[#365844] cursor-pointer btn-tactile focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#365844]"
                           >
                             <Check className="w-3 h-3 text-[#365844]" />
                             <span>Confirm</span>
@@ -148,7 +148,7 @@ export const HabitMemoryView: React.FC<HabitMemoryViewProps> = ({ habits, onRefr
                         )}
                         <button
                           onClick={() => handleFeedback(h.habit_key, 'muted')}
-                          className="flex items-center gap-1 text-[#8A928A] hover:text-[#C85A32] cursor-pointer"
+                          className="flex items-center gap-1 text-[#8A928A] hover:text-[#C85A32] cursor-pointer btn-tactile focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#365844]"
                         >
                           <VolumeX className="w-3 h-3" />
                           <span>Mute</span>
@@ -157,8 +157,8 @@ export const HabitMemoryView: React.FC<HabitMemoryViewProps> = ({ habits, onRefr
                     )}
                   </div>
                 ) : (
-                  <span className="text-[10px] font-mono text-[#8A928A]">
-                    Synthetic Observation
+                  <span className="text-[10px] font-mono text-[#8A928A] italic">
+                    Demo • Read-only
                   </span>
                 )}
               </div>
