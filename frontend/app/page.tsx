@@ -63,28 +63,32 @@ export default function HomePage() {
           duration: 0.28,
         });
 
-        // 2. Primary featured observation
-        tl.from(
-          '.home-featured-card',
-          {
-            opacity: 0,
-            y: 8,
-            duration: 0.32,
-          },
-          '-=0.14'
-        );
+        // 2. Primary featured observation (if present)
+        if (featured) {
+          tl.from(
+            '.home-featured-card',
+            {
+              opacity: 0,
+              y: 8,
+              duration: 0.32,
+            },
+            '-=0.14'
+          );
+        }
 
         // 3. Secondary observations (if any)
-        tl.from(
-          '.home-secondary-card',
-          {
-            opacity: 0,
-            y: 6,
-            duration: 0.24,
-            stagger: 0.05,
-          },
-          '-=0.12'
-        );
+        if (briefing.secondaryObservations.length > 0) {
+          tl.from(
+            '.home-secondary-card',
+            {
+              opacity: 0,
+              y: 6,
+              duration: 0.24,
+              stagger: 0.05,
+            },
+            '-=0.12'
+          );
+        }
 
         // 4. Financial snapshot cards
         tl.from(
@@ -136,7 +140,7 @@ export default function HomePage() {
         );
       }
     },
-    [hasData, featured?.habit_key, briefing.secondaryObservations.length]
+    [hasData]
   );
 
   const handleFeedback = async (habitKey: string, status: 'confirmed' | 'muted') => {

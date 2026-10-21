@@ -3,16 +3,30 @@ import gsap from 'gsap';
 
 /**
  * Checks whether the user has requested reduced motion.
- * Safely defaults to true during SSR.
+ * Safely handles SSR and environments without window.matchMedia.
  */
 export function isReducedMotion(): boolean {
-  if (typeof window === 'undefined') return true;
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * React hook to manage GSAP animations scoped to a DOM container.
- * Automatically respects `prefers-reduced-motion: reduce` and cleans up on unmount.
+ *
+ * Lifecycle guarantees:
+ * 1. The GSAP context is created first and assigned before any animation callback runs.
+ *    This completely eliminates Temporal Dead Zone (TDZ) ReferenceErrors (e.g. accessing `ctx` before initialization).
+ * 2. Scoped selectors (`ctx.selector` or scoped querySelectors) are bound to `scopeRef.current`.
+ * 3. On unmount or dependency change, `ctx.revert()` is called to reverse inline styles,
+ *    halt active tweens, and prevent memory leaks / duplicate timelines in React Strict Mode.
+ * 4. Respects `prefers-reduced-motion: reduce`.
+ * 5. Exceptions inside animation callbacks are caught and logged so UI components never crash.
  */
 export function useGsapContext(
   scopeRef: RefObject<HTMLElement | null>,
@@ -23,12 +37,26 @@ export function useGsapContext(
     if (typeof window === 'undefined' || !scopeRef.current) return;
     if (isReducedMotion()) return;
 
-    const ctx = gsap.context(() => {
-      animationFn(ctx);
-    }, scopeRef);
+    let ctx: gsap.Context | undefined;
+    try {
+      // 1. Create the GSAP context first, binding the DOM container as scope.
+      ctx = gsap.context(() => {}, scopeRef.current);
+
+      // 2. Add and execute the animation callback inside the context safely.
+      // `ctx` is already assigned and fully initialized before `ctx.add()` runs.
+      ctx.add((self) => {
+        try {
+          animationFn(self);
+        } catch (err) {
+          console.error('[Usually Motion] Error in GSAP animation callback:', err);
+        }
+      });
+    } catch (err) {
+      console.error('[Usually Motion] Error initializing GSAP context:', err);
+    }
 
     return () => {
-      ctx.revert();
+      ctx?.revert();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
@@ -36,7 +64,7 @@ export function useGsapContext(
 
 /**
  * Attaches a one-time IntersectionObserver to trigger a reveal when visible.
- * Automatically cleans up when unmounted.
+ * Returns an unmount cleanup function that disconnects the observer.
  */
 export function observeViewportReveal(
   element: HTMLElement | null,

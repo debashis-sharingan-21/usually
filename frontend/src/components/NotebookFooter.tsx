@@ -16,63 +16,70 @@ export const NotebookFooter: React.FC = () => {
   useEffect(() => {
     if (!footerRef.current || isReducedMotion() || hasAnimatedRef.current) return;
 
+    let ctx: gsap.Context | undefined;
     const cleanup = observeViewportReveal(
       footerRef.current,
       () => {
-        if (hasAnimatedRef.current) return;
+        if (hasAnimatedRef.current || !footerRef.current) return;
         hasAnimatedRef.current = true;
 
-        const ctx = gsap.context(() => {
-          const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+        try {
+          ctx = gsap.context(() => {}, footerRef.current);
+          ctx.add(() => {
+            const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
 
-          // 1. Subtle entrance of the left scene (illustration + brand statement)
-          tl.from('.footer-sloth-scene', {
-            opacity: 0,
-            y: 8,
-            duration: 0.35,
+            // 1. Subtle entrance of the left scene (illustration + brand statement)
+            tl.from('.footer-sloth-scene', {
+              opacity: 0,
+              y: 8,
+              duration: 0.35,
+            });
+
+            // 2. Sloth body & head soft settle
+            tl.from(
+              '.footer-sloth-body, .footer-sloth-head',
+              {
+                opacity: 0,
+                y: 5,
+                duration: 0.32,
+                stagger: 0.05,
+              },
+              '-=0.2'
+            );
+
+            // 3. Right columns stagger reveal (Index + Security note)
+            tl.from(
+              '.footer-column-item',
+              {
+                opacity: 0,
+                y: 6,
+                duration: 0.28,
+                stagger: 0.08,
+              },
+              '-=0.15'
+            );
+
+            // 4. Closing divider line & signature closing phrase
+            tl.from(
+              '.footer-bottom-bar',
+              {
+                opacity: 0,
+                duration: 0.25,
+              },
+              '-=0.1'
+            );
           });
-
-          // 2. Sloth body & head soft settle
-          tl.from(
-            '.footer-sloth-body, .footer-sloth-head',
-            {
-              opacity: 0,
-              y: 5,
-              duration: 0.32,
-              stagger: 0.05,
-            },
-            '-=0.2'
-          );
-
-          // 3. Right columns stagger reveal (Index + Security note)
-          tl.from(
-            '.footer-column-item',
-            {
-              opacity: 0,
-              y: 6,
-              duration: 0.28,
-              stagger: 0.08,
-            },
-            '-=0.15'
-          );
-
-          // 4. Closing divider line & signature closing phrase
-          tl.from(
-            '.footer-bottom-bar',
-            {
-              opacity: 0,
-              duration: 0.25,
-            },
-            '-=0.1'
-          );
-        }, footerRef);
-
-        return () => ctx.revert();
+        } catch (err) {
+          console.error('[Usually Footer Motion] Error executing footer entrance:', err);
+        }
       },
       0.12
     );
 
-    return cleanup;
+    return () => {
+      cleanup();
+      ctx?.revert();
+    };
   }, []);
 
   return (

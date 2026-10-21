@@ -52,15 +52,17 @@ export default function AnalysisPage() {
       );
 
       // 3. Section 02: Pace benchmark (if present)
-      tl.from(
-        '.analysis-pace-card',
-        {
-          opacity: 0,
-          y: 8,
-          duration: 0.28,
-        },
-        '-=0.12'
-      );
+      if (summary?.current_month_pace) {
+        tl.from(
+          '.analysis-pace-card',
+          {
+            opacity: 0,
+            y: 8,
+            duration: 0.28,
+          },
+          '-=0.12'
+        );
+      }
 
       // 4. Section 03: Category and Counterparties
       tl.from(
@@ -74,7 +76,7 @@ export default function AnalysisPage() {
         '-=0.12'
       );
     },
-    [hasData, summary?.transaction_count]
+    [hasData]
   );
 
   if (!summary || summary.transaction_count === 0) {
