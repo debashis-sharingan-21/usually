@@ -293,6 +293,35 @@ body {
   animation-delay: -2.6s;
 }
 
+/* Vintage Notebook Index Page Styling */
+.vintage-notebook-paper {
+  background-color: #FAF7EE;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 25px,
+    rgba(180, 195, 205, 0.35) 25px,
+    rgba(180, 195, 205, 0.35) 26px
+  );
+  background-size: 100% 26px;
+  background-position: 0 6px;
+}
+
+.vintage-notebook-shadow {
+  box-shadow: 2px 2px 0 rgba(223, 217, 202, 0.8),
+              4px 4px 0 rgba(238, 235, 221, 0.6),
+              0 6px 16px rgba(41, 45, 41, 0.04);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 200ms ease;
+}
+
+.vintage-notebook-shadow:hover {
+  transform: translateY(-2px);
+  box-shadow: 2px 3px 0 rgba(223, 217, 202, 0.9),
+              4px 6px 0 rgba(238, 235, 221, 0.7),
+              0 10px 22px rgba(41, 45, 41, 0.07);
+}
+
 /* Accessible Reduced-Motion Support */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -309,5 +338,11 @@ body {
     animation: none !important;
     opacity: 0.55 !important;
     transform: none !important;
+  }
+
+  .vintage-notebook-shadow,
+  .vintage-notebook-shadow:hover {
+    transform: none !important;
+    transition: none !important;
   }
 }

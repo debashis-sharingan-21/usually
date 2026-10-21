@@ -28,7 +28,7 @@ export const NotebookFooter: React.FC = () => {
           ctx.add(() => {
             const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
 
-            // 1. Subtle entrance of the left scene (illustration + brand statement)
+            // 1. Subtle entrance of the left scene (sloth illustration)
             tl.from('.footer-sloth-scene', {
               opacity: 0,
               y: 8,
@@ -47,9 +47,9 @@ export const NotebookFooter: React.FC = () => {
               '-=0.2'
             );
 
-            // 3. Right columns stagger reveal (Index + Security note)
+            // 3. Middle branding & Far Right Notebook reveal
             tl.from(
-              '.footer-column-item',
+              '.footer-middle-content, .footer-notebook-index',
               {
                 opacity: 0,
                 y: 6,
@@ -115,10 +115,10 @@ export const NotebookFooter: React.FC = () => {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-12 space-y-8">
-        {/* Main Footer Scene: Sloth resting on notebook spine + brand copy */}
-        <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-8">
+        {/* Main Footer Row: Sloth (Left), Branding & Tagline (Middle), Vintage Notebook Index (Far Right) */}
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-6">
           {/* Left: Illustrated Sloth on Branch Scene */}
-          <div className="footer-sloth-scene flex flex-col sm:flex-row items-center gap-5 sm:gap-6 text-center sm:text-left max-w-xl lg:max-w-2xl">
+          <div className="footer-sloth-scene shrink-0 flex justify-center">
             {/* Handcrafted Vector Scene — Scaled ~1.5x with continuous sleeping Z animation */}
             <div
               className={`shrink-0 w-36 h-[126px] sm:w-48 sm:h-[168px] relative transition-all duration-300 ease-out motion-reduce:transform-none cursor-default ${
@@ -234,76 +234,116 @@ export const NotebookFooter: React.FC = () => {
                 </g>
               </svg>
             </div>
-
-            {/* Brand Statement & Purpose */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-center sm:justify-start gap-2">
-                <span className="font-serif text-lg font-medium text-[#292D29]">Usually</span>
-                <span className="text-[#8A928A]" aria-hidden="true">—</span>
-                <span className="font-sans text-xs text-[#606860] italic">your money has habits</span>
-              </div>
-              <p className="text-xs text-[#606860] leading-relaxed font-sans max-w-sm">
-                A quiet personal finance companion that learns your recurring spending rhythms
-                and turns verified ledger data into conversational observations at your own pace.
-              </p>
-            </div>
           </div>
 
-          {/* Right: Thoughtful Navigation & Local Guarantees */}
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8 text-xs">
-            {/* Primary Destinations */}
-            <div className="footer-column-item space-y-2 text-center sm:text-left">
-              <span className="font-mono text-[11px] uppercase tracking-wider text-[#365844] font-semibold">
-                Notebook Index
+          {/* Middle: Brand Statement, Mission & Tagline */}
+          <div className="footer-middle-content space-y-2.5 text-center lg:text-left max-w-sm xl:max-w-md">
+            <div className="flex items-center justify-center lg:justify-start gap-2">
+              <span className="font-serif text-lg font-medium text-[#292D29]">Usually</span>
+              <span className="text-[#8A928A]" aria-hidden="true">—</span>
+              <span className="font-sans text-xs text-[#606860] italic">your money has habits</span>
+            </div>
+            <p className="text-xs text-[#606860] leading-relaxed font-sans">
+              A quiet personal finance companion that learns your recurring spending rhythms
+              and turns verified ledger data into conversational observations at your own pace.
+            </p>
+            <div className="pt-1 flex flex-wrap items-center justify-center lg:justify-start gap-2.5 text-[11px]">
+              <span className="notebook-annotation text-sm text-[#365844] select-none">
+                teach Usually once, remembered forever
               </span>
-              <ul className="space-y-1.5 text-[#606860] font-sans">
-                <li>
-                  <Link
-                    href="/"
-                    className="hover:text-[#292D29] hover:underline underline-offset-4 decoration-[#DFD9CA] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844] rounded-sm"
-                  >
-                    Home Briefing
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/analysis"
-                    className="hover:text-[#292D29] hover:underline underline-offset-4 decoration-[#DFD9CA] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844] rounded-sm"
-                  >
-                    Financial Analysis & Pacing
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/transactions"
-                    className="hover:text-[#292D29] hover:underline underline-offset-4 decoration-[#DFD9CA] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844] rounded-sm"
-                  >
-                    Verified Ledger
-                  </Link>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setIsImportOpen(true)}
-                    className="text-[#365844] hover:text-[#243B2E] hover:underline underline-offset-4 decoration-[#DFD9CA] cursor-pointer inline-flex items-center gap-1 transition-colors btn-tactile focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#365844] rounded-sm"
-                  >
-                    <UploadCloud className="w-3 h-3" />
-                    <span>Import Statement</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            {/* Local Privacy Note */}
-            <div className="footer-column-item space-y-2 max-w-xs text-center sm:text-left bg-[#FCFBF7] p-3.5 rounded-xl border border-[#DFD9CA] shadow-2xs hover:border-[#BFB9AA] transition-colors">
-              <div className="flex items-center justify-center sm:justify-start gap-1.5 font-mono text-[11px] text-[#365844] font-medium">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#365844]" />
-                <span>Private Workspace Isolation</span>
-              </div>
-              <p className="text-[11px] text-[#8A928A] leading-relaxed font-sans">
-                Every user workspace runs in its own segregated SQLite database. Statements and habit memory remain private to your session. For permanent offline storage, run Usually locally.
-              </p>
+              <span className="text-[#DFD9CA] hidden sm:inline" aria-hidden="true">•</span>
+              <span className="inline-flex items-center gap-1.5 font-mono text-[10.5px] text-[#606860] bg-[#FCFBF7] px-2 py-0.5 rounded-md border border-[#DFD9CA]">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#365844] shrink-0" />
+                <span>Private SQLite workspace</span>
+              </span>
             </div>
           </div>
+
+          {/* Far Right: Vintage Notebook Index Page */}
+          <nav
+            aria-label="Notebook Index"
+            className="footer-notebook-index w-full sm:w-[252px] vintage-notebook-paper border border-[#DFD9CA] rounded-r-lg rounded-l-xs vintage-notebook-shadow relative overflow-hidden select-none shrink-0"
+          >
+            <div className="flex min-h-[178px]">
+              {/* Left Sage Cloth Binding Spine Detail */}
+              <div
+                className="w-3.5 bg-[#8FA882] border-r border-[#768C69]/60 shrink-0 relative flex flex-col justify-around py-3"
+                aria-hidden="true"
+              >
+                {/* Vintage Thread Stitches */}
+                <span className="w-1.5 h-0.5 bg-[#4A5D3F]/70 mx-auto rounded-full" />
+                <span className="w-1.5 h-0.5 bg-[#4A5D3F]/70 mx-auto rounded-full" />
+                <span className="w-1.5 h-0.5 bg-[#4A5D3F]/70 mx-auto rounded-full" />
+              </div>
+
+              {/* Ruled Notebook Paper Surface */}
+              <div className="flex-1 py-3 px-3 relative">
+                {/* Subtle Red Vertical Margin Line */}
+                <div
+                  className="absolute top-0 bottom-0 left-[32px] w-[1px] bg-[rgba(215,90,75,0.38)] pointer-events-none"
+                  aria-hidden="true"
+                />
+
+                {/* Notebook Header */}
+                <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-[#E8E4D8]/90 pl-1">
+                  <h3 className="font-mono text-[10.5px] uppercase tracking-wider text-[#365844] font-bold">
+                    NOTEBOOK INDEX
+                  </h3>
+                  <span className="font-mono text-[9px] text-[#8A928A]">p. 01</span>
+                </div>
+
+                {/* 4 Preserved Navigation Links */}
+                <ul className="space-y-1 text-xs font-sans">
+                  <li className="flex items-center h-[26px]">
+                    <span className="w-5 font-mono text-[10px] text-[#A2A89E] pr-1.5 text-right select-none" aria-hidden="true">
+                      01
+                    </span>
+                    <Link
+                      href="/"
+                      className="pl-2.5 flex-1 py-0.5 text-[#292D29] hover:text-[#365844] hover:translate-x-0.5 transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#365844] rounded-xs font-medium"
+                    >
+                      Home Briefing
+                    </Link>
+                  </li>
+                  <li className="flex items-center h-[26px]">
+                    <span className="w-5 font-mono text-[10px] text-[#A2A89E] pr-1.5 text-right select-none" aria-hidden="true">
+                      02
+                    </span>
+                    <Link
+                      href="/analysis"
+                      className="pl-2.5 flex-1 py-0.5 text-[#292D29] hover:text-[#365844] hover:translate-x-0.5 transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#365844] rounded-xs font-medium"
+                    >
+                      Financial Analysis
+                    </Link>
+                  </li>
+                  <li className="flex items-center h-[26px]">
+                    <span className="w-5 font-mono text-[10px] text-[#A2A89E] pr-1.5 text-right select-none" aria-hidden="true">
+                      03
+                    </span>
+                    <Link
+                      href="/transactions"
+                      className="pl-2.5 flex-1 py-0.5 text-[#292D29] hover:text-[#365844] hover:translate-x-0.5 transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#365844] rounded-xs font-medium"
+                    >
+                      Verified Ledger
+                    </Link>
+                  </li>
+                  <li className="flex items-center h-[26px]">
+                    <span className="w-5 font-mono text-[10px] text-[#A2A89E] pr-1.5 text-right select-none" aria-hidden="true">
+                      04
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsImportOpen(true)}
+                      className="pl-2.5 flex-1 py-0.5 text-left text-[#365844] hover:text-[#243B2E] hover:translate-x-0.5 transition-all duration-150 inline-flex items-center justify-between pr-1 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#365844] rounded-xs font-medium group"
+                    >
+                      <span>Import Statement</span>
+                      <UploadCloud className="w-3 h-3 text-[#365844] group-hover:scale-110 transition-transform" />
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </nav>
         </div>
 
         {/* Fine Ruled Divider & Closing Accent */}
