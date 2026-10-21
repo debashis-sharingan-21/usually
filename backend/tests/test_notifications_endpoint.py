@@ -115,3 +115,103 @@ def test_notifications_honest_empty_state_on_sparse_history(clean_env):
     res = client.get("/api/notifications")
     assert res.status_code == 200
     assert res.json() == []
+
+def test_notifications_endpoint_handles_existing_database_with_missing_feedback_table(tmp_path, monkeypatch):
+    """
+    Regression Test for Issue:
+    Verifies that an existing database that has a 'transactions' table but lacks auxiliary
+    tables (like habit_feedback) does NOT crash with OperationalError (500), but self-heals
+    its schema and returns HTTP 200.
+    """
+    import sqlite3
+    db_path = str(tmp_path / "legacy_workspace.db")
+    conn = sqlite3.connect(db_path)
+    # Create ONLY transactions table, missing habit_feedback, user_settings, etc.
+    conn.execute("""
+        CREATE TABLE transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            import_batch_id TEXT,
+            date TEXT NOT NULL,
+            raw_description TEXT NOT NULL,
+            clean_merchant TEXT NOT NULL,
+            category TEXT NOT NULL,
+            amount REAL NOT NULL,
+            direction TEXT NOT NULL DEFAULT 'debit',
+            type TEXT NOT NULL DEFAULT 'expense',
+            currency TEXT NOT NULL DEFAULT 'INR',
+            fingerprint TEXT UNIQUE NOT NULL,
+            is_user_modified INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            ref_id TEXT
+        )
+    """)
+    # Insert 10 transactions
+    for i in range(10):
+        conn.execute(
+            "INSERT INTO transactions (date, raw_description, clean_merchant, category, amount, fingerprint, created_at) "
+            "VALUES (?, 'Coffee', 'Blue Tokai', 'Food & Dining', 220.0, ?, '2026-10-18')",
+            (f"2026-10-{10+i}", f"legacy_fp_{i}")
+        )
+    conn.commit()
+    conn.close()
+
+    monkeypatch.setenv("USUALLY_DB_PATH", db_path)
+    client = TestClient(app)
+
+    res = client.get("/api/notifications")
+    assert res.status_code == 200
+    assert isinstance(res.json(), list)
+
+def test_notifications_in_authenticated_personal_workspace_with_habits(clean_env):
+    """
+    Verifies that an authenticated personal workspace with qualifying transactions
+    receives valid, evidence-backed notifications under their personal token.
+    """
+    import json
+    client = TestClient(app)
+    res_guest = client.post("/api/auth/guest")
+    assert res_guest.status_code == 200
+    token = res_guest.json()["token"]
+
+    # Import statement with recurring Wednesday transactions
+    csv_data = "Date,Description,Amount,Type\n"
+    # 6 consecutive Wednesdays (satisfies minimum 6 transaction safeguard)
+    for d in ["16/09/2026", "23/09/2026", "30/09/2026", "07/10/2026", "14/10/2026", "21/10/2026"]:
+        csv_data += f"{d},Swiggy Online Food,280.00,Debit\n"
+
+    res_import = client.post(
+        "/api/transactions/import",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("swiggy_wed.csv", csv_data.encode("utf-8"), "text/csv")},
+        data={"mapping": json.dumps({"date": "Date", "description": "Description", "amount": "Amount", "type": "Type"}), "currency": "INR"}
+    )
+    assert res_import.status_code == 200
+
+    # Fetch notifications as the authenticated user
+    notif_res = client.get(
+        "/api/notifications",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"reference_date": "2026-10-21"}
+    )
+    assert notif_res.status_code == 200
+    notifs = notif_res.json()
+    assert len(notifs) >= 1
+    assert any("swiggy" in n["habit_key"] for n in notifs)
+
+def test_notifications_empty_personal_workspace_returns_empty_array(clean_env):
+    """Verifies that an authenticated user with no transactions receives [] with HTTP 200."""
+    client = TestClient(app)
+    res_guest = client.post("/api/auth/guest")
+    token = res_guest.json()["token"]
+
+    res = client.get("/api/notifications", headers={"Authorization": f"Bearer {token}"})
+    assert res.status_code == 200
+    assert res.json() == []
+
+def test_notifications_invalid_token_returns_401(clean_env):
+    """Verifies that an invalid or expired token is rejected with HTTP 401 and does not expose data."""
+    client = TestClient(app)
+    res = client.get("/api/notifications", headers={"Authorization": "Bearer totally_bogus_token"})
+    assert res.status_code == 401
+    assert "Invalid or expired session token" in res.json()["detail"]
+

@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "oxlint",
-    "test": "node --experimental-strip-types --test src/lib/demo.test.ts",
+    "test": "node --experimental-strip-types --test src/lib/demo.test.ts src/lib/notifications.test.ts",
     "preview": "next start"
   },
   "dependencies": {

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Query, Depends
+import logging
+from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import List, Optional
 from datetime import datetime
 import sqlite3
@@ -7,6 +8,8 @@ from app.workspace import get_current_workspace, WorkspaceContext
 from app.services.habit_engine import detect_habits
 from app.models.schema import HabitObservation
 from app.services.ai_generator import generate_observation_with_ai
+
+logger = logging.getLogger("usually")
 
 router = APIRouter(prefix="/api/notifications", tags=["Notifications"])
 
@@ -39,15 +42,18 @@ def list_notifications(
         # Determine reference date for evaluating recency
         if reference_date:
             try:
-                ref_dt = datetime.strptime(reference_date, "%Y-%m-%d").date()
-            except ValueError:
+                ref_dt = datetime.strptime(str(reference_date)[:10], "%Y-%m-%d").date()
+            except (ValueError, TypeError):
                 ref_dt = datetime.now().date()
         else:
             cur = conn.cursor()
             cur.execute("SELECT MAX(date) FROM transactions")
             max_d_row = cur.fetchone()
             if max_d_row and max_d_row[0]:
-                ref_dt = datetime.strptime(max_d_row[0], "%Y-%m-%d").date()
+                try:
+                    ref_dt = datetime.strptime(str(max_d_row[0])[:10], "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    ref_dt = datetime.now().date()
             else:
                 ref_dt = datetime.now().date()
 
@@ -65,9 +71,9 @@ def list_notifications(
             last_seen_str = h.get("last_observed_date")
             if last_seen_str:
                 try:
-                    last_seen_dt = datetime.strptime(last_seen_str, "%Y-%m-%d").date()
+                    last_seen_dt = datetime.strptime(str(last_seen_str)[:10], "%Y-%m-%d").date()
                     days_since = (ref_dt - last_seen_dt).days
-                except ValueError:
+                except (ValueError, TypeError):
                     days_since = 999
             else:
                 days_since = 999
@@ -109,5 +115,13 @@ def list_notifications(
         ))
 
         return [item[0] for item in eligible]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"[Notifications] Error listing notifications: {type(exc).__name__}: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to compute notifications from transaction history"
+        )
     finally:
         conn.close()

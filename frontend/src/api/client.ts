@@ -175,10 +175,41 @@ export async function fetchSummary(): Promise<SpendingSummaryResponse> {
 }
 
 export async function fetchNotifications(): Promise<HabitObservation[]> {
-  const res = await fetch(`${API_BASE}/notifications`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error('Failed to fetch notifications');
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/notifications`, {
+      headers: getAuthHeaders(),
+    });
+  } catch {
+    throw new Error('Network error connecting to notifications service');
+  }
+
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const body = await res.json();
+        if (body && typeof body.detail === 'string') {
+          // Keep safe, short error message without stack trace or local paths
+          detail = body.detail
+            .split('\n')[0]
+            .replace(/([A-Z]:\\[^\s]+|\/[^\s]+)/gi, '')
+            .trim()
+            .slice(0, 100);
+        }
+      }
+    } catch {
+      // Safe fallback if response body is non-JSON or HTML
+    }
+
+    const safeMessage = detail
+      ? `HTTP ${res.status}: ${detail}`
+      : `HTTP ${res.status} ${res.statusText || 'Error'}`.trim();
+
+    throw new Error(safeMessage);
+  }
+
   return res.json();
 }
 

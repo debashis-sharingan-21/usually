@@ -18,6 +18,7 @@ import {
   logoutUser as apiLogout,
   deleteWorkspace as apiDeleteWorkspace,
   getStoredToken,
+  clearStoredToken,
   getActiveWorkspaceContext,
   setActiveWorkspaceContext,
 } from '@/api/client';
@@ -107,10 +108,12 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }
           } else {
             setUser(null);
+            clearStoredToken();
           }
         } catch {
           // Token expired or invalid
           setUser(null);
+          clearStoredToken();
         }
       } else {
         setUser(null);

@@ -141,6 +141,36 @@ def set_active_context(context: str):
     except Exception:
         pass
 
+REQUIRED_SCHEMA_TABLES = {
+    "import_batches",
+    "transactions",
+    "habit_feedback",
+    "user_settings",
+    "learned_payees",
+    "payee_questions",
+}
+
+def ensure_database_schema(conn: sqlite3.Connection):
+    """
+    Ensures all required schema tables and column migrations exist in the database.
+    Does NOT assume an existing workspace database is current merely because its
+    'transactions' table exists.
+    Checks for missing tables or columns before performing schema modifications.
+    """
+    cur = conn.cursor()
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    existing_tables = {row[0] for row in cur.fetchall()}
+
+    if not REQUIRED_SCHEMA_TABLES.issubset(existing_tables):
+        with conn:
+            conn.executescript(SCHEMA_SQL)
+
+    if "transactions" in existing_tables:
+        cur.execute("PRAGMA table_info(transactions)")
+        cols = {row[1] for row in cur.fetchall()}
+        if "direction" not in cols or "ref_id" not in cols:
+            migrate_db(conn)
+
 def get_connection(context: Optional[Any] = None, workspace: Optional[Any] = None) -> sqlite3.Connection:
     # Defensively handle if a WorkspaceContext was passed as the first positional argument
     if hasattr(context, "db_path"):
@@ -161,14 +191,8 @@ def get_connection(context: Optional[Any] = None, workspace: Optional[Any] = Non
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA foreign_keys = ON")
 
-    # If this is a personal workspace, ensure schema and tables are initialized
-    if workspace is not None and getattr(workspace, "workspace_type", None) == "personal":
-        cur = conn.cursor()
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='transactions'")
-        if not cur.fetchone():
-            with conn:
-                conn.executescript(SCHEMA_SQL)
-            migrate_db(conn)
+    # Authoritatively verify that all required tables and column migrations exist
+    ensure_database_schema(conn)
 
     return conn
 

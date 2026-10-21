@@ -24,8 +24,12 @@ def detect_habits(conn: sqlite3.Connection, reference_date: Optional[str] = None
         migrate_db(conn)
 
     # Load feedback table to respect muted or confirmed habits
-    cur.execute("SELECT habit_key, status, notes FROM habit_feedback")
-    feedback_map = {r[0]: {"status": r[1], "notes": r[2]} for r in cur.fetchall()}
+    feedback_map = {}
+    try:
+        cur.execute("SELECT habit_key, status, notes FROM habit_feedback")
+        feedback_map = {r[0]: {"status": r[1], "notes": r[2]} for r in cur.fetchall()}
+    except Exception:
+        pass
 
     # Load tone setting
     current_tone = "playful"
