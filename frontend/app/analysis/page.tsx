@@ -49,7 +49,7 @@ export default function AnalysisPage() {
   const netBalanceDelta = summary.net_balance_change ?? (grossInflow - grossOutflow);
   const p2pIn = summary.total_p2p_incoming ?? 0;
   const transfersIn = summary.total_transfers_in ?? 0;
-  const externalInflows = p2pIn + (summary.total_income || 0) + (summary.total_refunds || 0);
+  const externalInflows = summary.external_inflows ?? (p2pIn + (summary.total_income || 0) + (summary.total_refunds || 0));
   const consumerSurplus = summary.consumer_margin ?? (externalInflows - summary.total_expenses);
 
   return (
@@ -129,7 +129,11 @@ export default function AnalysisPage() {
               ₹{grossInflow.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </div>
             <div className="text-[11px] text-[#8A928A] font-sans">
-              Peer inflows (₹{p2pIn.toLocaleString('en-IN', { maximumFractionDigits: 0 })}) + transfers in
+              {summary.total_income > 0 && p2pIn === 0
+                ? `Income (₹${summary.total_income.toLocaleString('en-IN', { maximumFractionDigits: 0 })}) + refunds`
+                : summary.total_income > 0
+                ? `Income + peer inflows (₹${p2pIn.toLocaleString('en-IN', { maximumFractionDigits: 0 })})`
+                : `Peer receipts (₹${p2pIn.toLocaleString('en-IN', { maximumFractionDigits: 0 })}) + transfers in`}
             </div>
           </div>
 

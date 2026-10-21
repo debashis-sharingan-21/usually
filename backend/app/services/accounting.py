@@ -22,19 +22,39 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         migrate_db(conn)
 
     # Consolidated single-pass aggregation query for all ledger totals and bounds
+    # Uses strictly mutually exclusive partitioning to guarantee:
+    # 1. Gross Debit Outflow = Total Living Expenses + Transfers Out + P2P Outgoing
+    # 2. Gross Credit Inflow = Total Income + P2P Incoming + Total Refunds + Transfers In
     cur.execute("""
         SELECT
             COUNT(*),
             MIN(date),
             MAX(date),
-            COALESCE(SUM(CASE WHEN direction = 'debit' AND type = 'expense' AND category != 'Transfers' THEN amount ELSE 0 END), 0.0),
-            COALESCE(SUM(CASE WHEN direction = 'credit' AND type = 'income' THEN amount ELSE 0 END), 0.0),
-            COALESCE(SUM(CASE WHEN direction = 'credit' AND type = 'refund' THEN amount ELSE 0 END), 0.0),
-            COALESCE(SUM(CASE WHEN direction = 'debit' AND (type = 'transfer' OR category = 'Transfers') THEN amount ELSE 0 END), 0.0),
-            COALESCE(SUM(CASE WHEN direction = 'credit' AND (type = 'transfer' OR category = 'Transfers') THEN amount ELSE 0 END), 0.0),
-            COALESCE(SUM(CASE WHEN direction = 'debit' AND type = 'p2p' THEN amount ELSE 0 END), 0.0),
-            COALESCE(SUM(CASE WHEN direction = 'credit' AND type = 'p2p' THEN amount ELSE 0 END), 0.0),
+            -- Outgoing classifications (strictly mutually exclusive partitioning of debits)
+            COALESCE(SUM(CASE 
+                WHEN direction = 'debit' AND (type = 'transfer' OR category = 'Transfers') 
+                THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE 
+                WHEN direction = 'debit' AND NOT (type = 'transfer' OR category = 'Transfers') AND type = 'p2p' 
+                THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE 
+                WHEN direction = 'debit' AND NOT (type = 'transfer' OR category = 'Transfers') AND type != 'p2p' 
+                THEN amount ELSE 0 END), 0.0),
             COALESCE(SUM(CASE WHEN direction = 'debit' THEN amount ELSE 0 END), 0.0),
+
+            -- Incoming classifications (strictly mutually exclusive partitioning of credits)
+            COALESCE(SUM(CASE 
+                WHEN direction = 'credit' AND (type = 'transfer' OR category = 'Transfers') 
+                THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE 
+                WHEN direction = 'credit' AND NOT (type = 'transfer' OR category = 'Transfers') AND (type = 'refund' OR category = 'Refund') 
+                THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE 
+                WHEN direction = 'credit' AND NOT (type = 'transfer' OR category = 'Transfers') AND NOT (type = 'refund' OR category = 'Refund') AND (type = 'income' OR category = 'Income') 
+                THEN amount ELSE 0 END), 0.0),
+            COALESCE(SUM(CASE 
+                WHEN direction = 'credit' AND NOT (type = 'transfer' OR category = 'Transfers') AND NOT (type = 'refund' OR category = 'Refund') AND NOT (type = 'income' OR category = 'Income') 
+                THEN amount ELSE 0 END), 0.0),
             COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE 0 END), 0.0)
         FROM transactions
     """)
@@ -43,14 +63,14 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         tx_count,
         min_date,
         max_date,
-        total_expenses,
-        total_income,
-        total_refunds,
         total_transfers,
-        total_transfers_in,
         total_p2p_outgoing,
-        total_p2p_incoming,
+        total_expenses,
         gross_debit_outflow,
+        total_transfers_in,
+        total_refunds,
+        total_income,
+        total_p2p_incoming,
         gross_credit_inflow
     ) = (
         agg_row[0] if agg_row else 0,
@@ -83,7 +103,7 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         SELECT clean_merchant, category, SUM(amount) as total_amt, COUNT(*) as txn_count,
                MIN(date) as first_seen, MAX(date) as last_seen
         FROM transactions
-        WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
+        WHERE direction = 'debit' AND NOT (type = 'transfer' OR category = 'Transfers') AND type != 'p2p'
         GROUP BY clean_merchant
         ORDER BY total_amt DESC
         LIMIT 10
@@ -104,7 +124,7 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     cur.execute("""
         SELECT category, SUM(amount) as total_amt, COUNT(*) as txn_count
         FROM transactions
-        WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
+        WHERE direction = 'debit' AND NOT (type = 'transfer' OR category = 'Transfers') AND type != 'p2p'
         GROUP BY category
         ORDER BY total_amt DESC
     """)
@@ -123,7 +143,7 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
     cur.execute("""
         SELECT strftime('%Y-%m', date) as month, SUM(amount) as monthly_expense
         FROM transactions
-        WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
+        WHERE direction = 'debit' AND NOT (type = 'transfer' OR category = 'Transfers') AND type != 'p2p'
         GROUP BY month
         ORDER BY month ASC
     """)
@@ -140,7 +160,7 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         cur.execute("""
             SELECT COALESCE(SUM(amount), 0.0)
             FROM transactions
-            WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
+            WHERE direction = 'debit' AND NOT (type = 'transfer' OR category = 'Transfers') AND type != 'p2p'
               AND strftime('%Y-%m', date) = ?
               AND CAST(strftime('%d', date) AS INTEGER) <= ?
         """, (latest_month, latest_day))
@@ -150,7 +170,7 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         cur.execute("""
             SELECT strftime('%Y-%m', date) as m, COALESCE(SUM(amount), 0.0)
             FROM transactions
-            WHERE direction = 'debit' AND type = 'expense' AND category != 'Transfers'
+            WHERE direction = 'debit' AND NOT (type = 'transfer' OR category = 'Transfers') AND type != 'p2p'
               AND strftime('%Y-%m', date) < ?
               AND CAST(strftime('%d', date) AS INTEGER) <= ?
             GROUP BY m
@@ -183,6 +203,7 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
         "total_p2p_incoming": round(total_p2p_incoming, 2),
         "gross_debit_outflow": round(gross_debit_outflow, 2),
         "gross_credit_inflow": round(gross_credit_inflow, 2),
+        "external_inflows": external_inflows,
         "net_cash_flow": net_cash_flow,
         "consumer_margin": consumer_margin,
         "net_balance_change": net_balance_change,

@@ -372,7 +372,11 @@ export default function HomePage() {
                     ₹{(summary.gross_credit_inflow ?? summary.total_income).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                   </div>
                   <div className="text-[11px] text-[#8A928A] font-sans">
-                    Peer receipts (₹{(summary.total_p2p_incoming || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}) + transfers in
+                    {summary.total_income > 0 && (summary.total_p2p_incoming || 0) === 0
+                      ? `Income (₹${summary.total_income.toLocaleString('en-IN', { maximumFractionDigits: 0 })}) + refunds`
+                      : (summary.total_income || 0) > 0
+                      ? `Income + peer inflows (₹${(summary.total_p2p_incoming || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })})`
+                      : `Peer receipts (₹${(summary.total_p2p_incoming || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}) + transfers in`}
                   </div>
                 </div>
 

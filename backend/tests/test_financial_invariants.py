@@ -127,7 +127,13 @@ def test_invariant_4_consumer_margin_identity(isolated_db):
     assert summary["total_p2p_incoming"] == 2000.0
     assert summary["total_expenses"] == 8000.0
     assert summary["total_transfers"] == 15000.0
+    assert summary["external_inflows"] == 62000.0
     assert summary["consumer_margin"] == expected_consumer_margin
+
+    # Crucial safeguard: Consumer Margin and Net Balance Delta MUST deliberately differ
+    # because of non-consumer CC transfer (15000)
+    assert summary["consumer_margin"] != summary["net_balance_change"]
+    assert round(summary["consumer_margin"] - summary["net_balance_change"], 2) == 15000.0
 
 
 def test_invariant_5_credit_purity(isolated_db):
@@ -370,3 +376,56 @@ def test_invariant_15_no_data_exfiltration():
         assert "requests" not in imported_names
         assert "urllib" not in imported_names
         assert "telemetry" not in imported_names
+
+
+def test_invariant_16_mutually_exclusive_partition_identities(isolated_db):
+    """
+    Invariant 16: Outgoing and incoming breakdowns must strictly partition all transactions.
+    - Total Expenses + Total Transfers Out + Total P2P Outgoing == Gross Debit Outflow
+    - Total Income + Total P2P Incoming + Total Refunds + Total Transfers In == Gross Credit Inflow
+    - Gross Account Balance Change == Gross Credit Inflow - Gross Debit Outflow
+    - Consumer Margin == (Total Income + Total P2P Incoming + Total Refunds) - Total Expenses
+    - Consumer Margin - Gross Balance Change == Transfers Out + P2P Out - Transfers In
+    """
+    cur = isolated_db.cursor()
+    cur.execute("""
+        INSERT INTO transactions (date, raw_description, clean_merchant, amount, direction, type, category, currency, fingerprint, is_user_modified, created_at)
+        VALUES
+            ('2026-10-01', 'Salary', 'Employer', 75000.0, 'credit', 'income', 'Salary', 'INR', 'fp1', 0, '2026-10-01T00:00:00'),
+            ('2026-10-02', 'Dining Out', 'Bistro', 1800.0, 'debit', 'expense', 'Food & Dining', 'INR', 'fp2', 0, '2026-10-02T00:00:00'),
+            ('2026-10-03', 'Paid to Roommate', 'Roommate', 4500.0, 'debit', 'p2p', 'Personal & Peer', 'INR', 'fp3', 0, '2026-10-03T00:00:00'),
+            ('2026-10-04', 'Card Settlement', 'HDFC Card', 12000.0, 'debit', 'transfer', 'Transfers', 'INR', 'fp4', 0, '2026-10-04T00:00:00'),
+            ('2026-10-05', 'Received from Sister', 'Sister', 3000.0, 'credit', 'p2p', 'Personal & Peer', 'INR', 'fp5', 0, '2026-10-05T00:00:00'),
+            ('2026-10-06', 'Merchant Cashback', 'Paytm', 150.0, 'credit', 'refund', 'Refund', 'INR', 'fp6', 0, '2026-10-06T00:00:00'),
+            ('2026-10-07', 'Transfer from Deposit', 'Fixed Deposit', 20000.0, 'credit', 'transfer', 'Transfers', 'INR', 'fp7', 0, '2026-10-07T00:00:00')
+    """)
+    isolated_db.commit()
+
+    summary = calculate_spending_summary(isolated_db)
+
+    # Outgoing partition
+    outflow_partition = round(summary["total_expenses"] + summary["total_transfers"] + summary["total_p2p_outgoing"], 2)
+    assert outflow_partition == summary["gross_debit_outflow"]
+    assert summary["gross_debit_outflow"] == round(1800.0 + 12000.0 + 4500.0, 2)  # 18300.0
+
+    # Incoming partition
+    inflow_partition = round(summary["total_income"] + summary["total_p2p_incoming"] + summary["total_refunds"] + summary["total_transfers_in"], 2)
+    assert inflow_partition == summary["gross_credit_inflow"]
+    assert summary["gross_credit_inflow"] == round(75000.0 + 3000.0 + 150.0 + 20000.0, 2)  # 98150.0
+
+    # Net Balance Delta
+    expected_delta = round(summary["gross_credit_inflow"] - summary["gross_debit_outflow"], 2)  # 79850.0
+    assert summary["net_balance_change"] == expected_delta
+
+    # Consumer Margin
+    expected_external_inflows = round(75000.0 + 3000.0 + 150.0, 2)  # 78150.0 (excludes 20000 internal transfer in)
+    assert summary["external_inflows"] == expected_external_inflows
+    expected_margin = round(expected_external_inflows - summary["total_expenses"], 2)  # 78150 - 1800 = 76350.0
+    assert summary["consumer_margin"] == expected_margin
+
+    # Mathematical relationship between Margin and Balance Delta:
+    # consumer_margin - net_balance_change == total_transfers + total_p2p_outgoing - total_transfers_in
+    diff = round(summary["consumer_margin"] - summary["net_balance_change"], 2)
+    expected_diff = round(summary["total_transfers"] + summary["total_p2p_outgoing"] - summary["total_transfers_in"], 2)
+    assert diff == expected_diff  # 12000 + 4500 - 20000 = -3500.0
+

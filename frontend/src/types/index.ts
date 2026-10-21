@@ -99,6 +99,7 @@ export interface SpendingSummaryResponse {
   total_p2p_incoming?: number;
   gross_debit_outflow?: number;
   gross_credit_inflow?: number;
+  external_inflows?: number;
   net_cash_flow: number;
   consumer_margin?: number;
   net_balance_change?: number;

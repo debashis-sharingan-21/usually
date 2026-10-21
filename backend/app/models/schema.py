@@ -97,6 +97,7 @@ class SpendingSummaryResponse(BaseModel):
     total_p2p_incoming: float = 0.0
     gross_debit_outflow: float = 0.0
     gross_credit_inflow: float = 0.0
+    external_inflows: float = 0.0
     net_cash_flow: float
     consumer_margin: float = 0.0
     net_balance_change: float = 0.0

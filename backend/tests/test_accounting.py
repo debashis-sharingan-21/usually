@@ -104,8 +104,13 @@ def test_accounting_calculations():
 
     # 5. Invariant: Consumer Margin = External Inflows (Income + P2P In + Refunds) - Living Expenses
     # (excludes non-consumer internal account transfers of 15000 out and 10000 in)
-    expected_consumer_margin = (80000.0 + 5000.0 + 400.0) - 1600.0  # 83800.0
+    expected_external_inflows = 80000.0 + 5000.0 + 400.0  # 85400.0
+    expected_consumer_margin = expected_external_inflows - 1600.0  # 83800.0
+    assert summary["external_inflows"] == expected_external_inflows
     assert summary["consumer_margin"] == expected_consumer_margin
+    # Consumer margin and net balance delta deliberately differ by transfers and peer movements:
+    assert summary["consumer_margin"] != summary["net_balance_change"]
+    assert round(summary["consumer_margin"] - summary["net_balance_change"], 2) == round(15000.0 + 3000.0 - 10000.0, 2)
     # Invariant: Net cash flow strictly equals net balance change (gross inflow - gross outflow)
     assert summary["net_cash_flow"] == summary["net_balance_change"]
 
