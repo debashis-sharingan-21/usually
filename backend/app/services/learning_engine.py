@@ -101,10 +101,39 @@ def generate_payee_questions_for_batch(conn: sqlite3.Connection, batch_id: str) 
         q_id = f"q_{uuid.uuid4().hex[:10]}"
         prompt = f"I noticed {cnt} payment{'s' if cnt > 1 else ''} to {merchant_name} totaling ₹{tot:,.0f}. What kind of payments are these?"
 
+        # Attempt local AI suggestion if Ollama is available
+        sugg_cat = None
+        sugg_type = None
+        ai_reason = None
+        ai_conf = None
+        sugg_by = None
+        try:
+            from app.services.ai_generator import check_ollama_status, suggest_merchant_category_with_ai
+            ollama_ok, _ = check_ollama_status()
+            if ollama_ok:
+                ai_res = suggest_merchant_category_with_ai(merchant_name)
+                if ai_res:
+                    sugg_cat = ai_res.get("suggested_category")
+                    sugg_type = ai_res.get("suggested_type")
+                    ai_reason = ai_res.get("reason")
+                    ai_conf = ai_res.get("confidence")
+                    sugg_by = ai_res.get("suggested_by")
+        except Exception:
+            pass
+
         cur.execute("""
-            INSERT INTO payee_questions (id, payee_key, payee_name, prompt, options_json, transaction_count, total_amount, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-        """, (q_id, payee_key, merchant_name, prompt, json.dumps(DEFAULT_OPTIONS), cnt, tot, now_iso, now_iso))
+            INSERT INTO payee_questions (
+                id, payee_key, payee_name, prompt, options_json,
+                transaction_count, total_amount, status,
+                suggested_category, suggested_type, ai_reason, ai_confidence, suggested_by,
+                created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            q_id, payee_key, merchant_name, prompt, json.dumps(DEFAULT_OPTIONS),
+            cnt, tot, sugg_cat, sugg_type, ai_reason, ai_conf, sugg_by,
+            now_iso, now_iso
+        ))
 
         existing_question_keys.add(payee_key)
         created_count += 1
@@ -113,10 +142,12 @@ def generate_payee_questions_for_batch(conn: sqlite3.Connection, batch_id: str) 
     return created_count
 
 def get_pending_questions(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
+    migrate_db(conn)
     cur = conn.cursor()
     try:
         cur.execute("""
-            SELECT id, payee_key, payee_name, prompt, options_json, transaction_count, total_amount, status, created_at
+            SELECT id, payee_key, payee_name, prompt, options_json, transaction_count, total_amount, status, created_at,
+                   suggested_category, suggested_type, ai_reason, ai_confidence, suggested_by
             FROM payee_questions
             WHERE status = 'pending'
             ORDER BY total_amount DESC, transaction_count DESC
@@ -134,10 +165,81 @@ def get_pending_questions(conn: sqlite3.Connection) -> List[Dict[str, Any]]:
                 "total_amount": round(r[6], 2),
                 "status": r[7],
                 "created_at": r[8],
+                "suggested_category": r[9],
+                "suggested_type": r[10],
+                "ai_reason": r[11],
+                "ai_confidence": round(r[12], 2) if r[12] is not None else None,
+                "suggested_by": r[13],
             })
         return questions
     except sqlite3.OperationalError:
         return []
+
+def get_or_generate_question_suggestion(conn: sqlite3.Connection, question_id: str) -> Dict[str, Any]:
+    """
+    Retrieves or generates an on-demand Gemma classification for an ambiguous payee question.
+    """
+    migrate_db(conn)
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT id, payee_key, payee_name, prompt, options_json, transaction_count, total_amount, status, created_at,
+               suggested_category, suggested_type, ai_reason, ai_confidence, suggested_by
+        FROM payee_questions
+        WHERE id = ?
+    """, (question_id,))
+    row = cur.fetchone()
+    if not row:
+        raise ValueError(f"Question with ID {question_id} not found")
+
+    q_data = {
+        "id": row[0],
+        "payee_key": row[1],
+        "payee_name": row[2],
+        "prompt": row[3],
+        "options": json.loads(row[4]),
+        "transaction_count": row[5],
+        "total_amount": round(row[6], 2),
+        "status": row[7],
+        "created_at": row[8],
+        "suggested_category": row[9],
+        "suggested_type": row[10],
+        "ai_reason": row[11],
+        "ai_confidence": round(row[12], 2) if row[12] is not None else None,
+        "suggested_by": row[13],
+    }
+
+    if q_data["suggested_category"] and q_data["suggested_by"]:
+        return q_data
+
+    from app.services.ai_generator import check_ollama_status, suggest_merchant_category_with_ai
+    ollama_ok, _ = check_ollama_status()
+    if not ollama_ok:
+        return q_data
+
+    ai_res = suggest_merchant_category_with_ai(q_data["payee_name"])
+    if ai_res:
+        now_iso = datetime.now().isoformat()
+        with conn:
+            conn.execute("""
+                UPDATE payee_questions
+                SET suggested_category = ?, suggested_type = ?, ai_reason = ?, ai_confidence = ?, suggested_by = ?, updated_at = ?
+                WHERE id = ?
+            """, (
+                ai_res["suggested_category"],
+                ai_res["suggested_type"],
+                ai_res["reason"],
+                ai_res["confidence"],
+                ai_res["suggested_by"],
+                now_iso,
+                question_id
+            ))
+        q_data["suggested_category"] = ai_res["suggested_category"]
+        q_data["suggested_type"] = ai_res["suggested_type"]
+        q_data["ai_reason"] = ai_res["reason"]
+        q_data["ai_confidence"] = ai_res["confidence"]
+        q_data["suggested_by"] = ai_res["suggested_by"]
+
+    return q_data
 
 def apply_payee_learning(
     conn: sqlite3.Connection,
@@ -203,20 +305,29 @@ def answer_payee_question(
 ) -> Dict[str, Any]:
     migrate_db(conn)
     cur = conn.cursor()
-    cur.execute("SELECT payee_key, payee_name, options_json FROM payee_questions WHERE id = ?", (question_id,))
+    cur.execute("""
+        SELECT payee_key, payee_name, options_json, suggested_category, suggested_type, ai_reason, suggested_by
+        FROM payee_questions
+        WHERE id = ?
+    """, (question_id,))
     row = cur.fetchone()
     if not row:
         raise ValueError(f"Question with ID {question_id} not found")
 
-    payee_key, payee_name, options_json = row
+    payee_key, payee_name, options_json, sugg_cat, sugg_type, ai_reason, sugg_by = row
     options = json.loads(options_json)
 
     chosen = next((opt for opt in options if opt["id"] == selected_option_id), None)
-    if not chosen and not custom_category:
+    if not chosen and selected_option_id == "ai_suggestion" and sugg_cat:
+        final_cat = custom_category or sugg_cat
+        final_type = custom_type or sugg_type or "expense"
+        notes = notes or (f"Gemma suggestion ({sugg_by or 'local_ollama'}): {ai_reason}" if ai_reason else "Accepted Gemma suggestion")
+    elif not chosen and not custom_category:
         raise ValueError("Invalid option selected and no custom category provided")
-
-    final_cat = custom_category or (chosen["category"] if chosen else "General")
-    final_type = custom_type or (chosen["transaction_type"] if chosen else "expense")
+    else:
+        final_cat = custom_category or (chosen["category"] if chosen else "General")
+        final_type = custom_type or (chosen["transaction_type"] if chosen else "expense")
+        notes = notes or (chosen.get("description") if chosen else None)
     now_iso = datetime.now().isoformat()
 
     with conn:

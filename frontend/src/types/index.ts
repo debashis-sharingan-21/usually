@@ -131,6 +131,8 @@ export interface SpendingSummaryResponse {
     historical_baseline_pace: number;
     diff_percentage: number;
     status: 'higher' | 'lower' | 'on_track';
+    explanation?: string;
+    generated_by?: 'ollama_gemma' | 'deterministic_engine';
   };
 }
 
@@ -151,6 +153,11 @@ export interface PayeeQuestion {
   transaction_count: number;
   total_amount: number;
   status: 'pending' | 'answered' | 'dismissed';
+  suggested_category?: string;
+  suggested_type?: string;
+  ai_reason?: string;
+  ai_confidence?: number;
+  suggested_by?: string;
   created_at: string;
 }
 

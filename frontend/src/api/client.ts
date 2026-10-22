@@ -239,13 +239,34 @@ export async function fetchQuestions(): Promise<PayeeQuestion[]> {
   return res.json();
 }
 
-export async function answerQuestion(question_id: string, selected_option_id: string) {
+export async function answerQuestion(
+  question_id: string,
+  selected_option_id: string,
+  custom_category?: string,
+  custom_type?: string,
+  notes?: string
+) {
   const res = await fetch(`${API_BASE}/learning/answer`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ question_id, selected_option_id }),
+    body: JSON.stringify({
+      question_id,
+      selected_option_id,
+      custom_category,
+      custom_type,
+      notes
+    }),
   });
   if (!res.ok) throw new Error('Failed to submit answer');
+  return res.json();
+}
+
+export async function requestPayeeAiSuggestion(question_id: string): Promise<PayeeQuestion> {
+  const res = await fetch(`${API_BASE}/learning/questions/${question_id}/suggest`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to request AI suggestion');
   return res.json();
 }
 

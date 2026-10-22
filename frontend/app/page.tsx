@@ -309,7 +309,17 @@ export default function HomePage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 text-[11px] font-mono">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono">
+                  {featured.generated_by === 'ollama_gemma' ? (
+                    <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#365844]/10 text-[#365844] border border-[#365844]/25 font-medium">
+                      <Sparkles className="w-3 h-3 text-[#365844]" />
+                      <span>Gemma 2B · Grounded</span>
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full bg-[#EEEBDD] text-[#606860] border border-[#DFD9CA]">
+                      Deterministic Engine
+                    </span>
+                  )}
                   <span className="px-2.5 py-0.5 rounded-full bg-[#EEEBDD] text-[#365844] border border-[#DFD9CA]">
                     {Math.round(featured.confidence * 100)}% verified
                   </span>
@@ -378,7 +388,9 @@ export default function HomePage() {
                 <div className="mt-4 p-5 bg-[#F7F5EE] border border-[#DFD9CA] rounded-xl space-y-3 animate-fade-in text-xs">
                   <div className="flex items-center justify-between text-[#606860] border-b border-[#DFD9CA] pb-2 font-mono text-[11px]">
                     <span className="font-medium text-[#292D29]">Supporting Evidence Facts</span>
-                    <span className="text-[#365844]">Local SQLite Verified</span>
+                    <span className="text-[#365844]">
+                      {featured.generated_by === 'ollama_gemma' ? 'Narrated by Gemma 2B (Local Ollama)' : 'Deterministic Pattern Rules'}
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-[12px]">

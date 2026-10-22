@@ -17,7 +17,8 @@ import {
   ArrowRight,
   Coins,
   Repeat,
-  Info
+  Info,
+  Sparkles
 } from 'lucide-react';
 
 export default function AnalysisPage() {
@@ -386,6 +387,27 @@ export default function AnalysisPage() {
                       </div>
                     </div>
                   </div>
+
+                  {pace.explanation && (
+                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-[#F4F1E6] border border-[#DFD9CA] text-xs animate-fade-in">
+                      <Sparkles className="w-3.5 h-3.5 text-[#365844] shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] uppercase tracking-wider text-[#365844] font-medium">
+                            {pace.generated_by === 'ollama_gemma' ? 'Gemma Pace Interpretation' : 'Pace Trajectory Note'}
+                          </span>
+                          {pace.generated_by === 'ollama_gemma' && (
+                            <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-[#365844]/10 text-[#365844] border border-[#365844]/20 font-medium">
+                              Local Ollama
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-[#292D29] leading-relaxed">
+                          {pace.explanation}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="text-[10px] font-sans text-[#8A928A] italic">
                     * Compares cumulative outflow through Day {pace.as_of_day} against equivalent historical checkpoints. Does not project final end-of-month spend.

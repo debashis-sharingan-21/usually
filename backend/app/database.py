@@ -75,6 +75,11 @@ CREATE TABLE IF NOT EXISTS payee_questions (
     transaction_count INTEGER NOT NULL,
     total_amount REAL NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'answered', 'dismissed'
+    suggested_category TEXT,
+    suggested_type TEXT,
+    ai_reason TEXT,
+    ai_confidence REAL,
+    suggested_by TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -285,6 +290,22 @@ def migrate_db(conn: sqlite3.Connection):
     cur.execute("CREATE INDEX IF NOT EXISTS idx_tx_batch ON transactions(import_batch_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_tx_fingerprint ON transactions(fingerprint)")
     conn.commit()
+
+    # Non-destructive migration for payee_questions AI suggestion columns
+    cur.execute("PRAGMA table_info(payee_questions)")
+    q_cols = [col[1] for col in cur.fetchall()]
+    if q_cols:
+        if "suggested_category" not in q_cols:
+            cur.execute("ALTER TABLE payee_questions ADD COLUMN suggested_category TEXT")
+        if "suggested_type" not in q_cols:
+            cur.execute("ALTER TABLE payee_questions ADD COLUMN suggested_type TEXT")
+        if "ai_reason" not in q_cols:
+            cur.execute("ALTER TABLE payee_questions ADD COLUMN ai_reason TEXT")
+        if "ai_confidence" not in q_cols:
+            cur.execute("ALTER TABLE payee_questions ADD COLUMN ai_confidence REAL")
+        if "suggested_by" not in q_cols:
+            cur.execute("ALTER TABLE payee_questions ADD COLUMN suggested_by TEXT")
+        conn.commit()
 
     heal_and_reconcile_transactions(conn)
 

@@ -4,6 +4,7 @@ from app.database import get_connection
 from app.workspace import get_current_workspace, require_personal_workspace, WorkspaceContext
 from app.services.learning_engine import (
     get_pending_questions,
+    get_or_generate_question_suggestion,
     answer_payee_question,
     dismiss_payee_question,
     list_learned_payees
@@ -19,6 +20,19 @@ def fetch_questions(
     conn = get_connection(workspace=workspace)
     try:
         return get_pending_questions(conn)
+    finally:
+        conn.close()
+
+@router.post("/questions/{question_id}/suggest", response_model=PayeeQuestion)
+def request_question_suggestion(
+    question_id: str,
+    workspace: WorkspaceContext = Depends(require_personal_workspace)
+):
+    conn = get_connection(workspace=workspace)
+    try:
+        return get_or_generate_question_suggestion(conn, question_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     finally:
         conn.close()
 

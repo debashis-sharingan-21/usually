@@ -137,6 +137,11 @@ class PayeeQuestion(BaseModel):
     transaction_count: int
     total_amount: float
     status: str = "pending"  # "pending", "answered", "dismissed"
+    suggested_category: Optional[str] = None
+    suggested_type: Optional[str] = None
+    ai_reason: Optional[str] = None
+    ai_confidence: Optional[float] = None
+    suggested_by: Optional[str] = None
     created_at: str
 
 class PayeeAnswerRequest(BaseModel):

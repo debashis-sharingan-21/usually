@@ -193,6 +193,18 @@ def calculate_spending_summary(conn: sqlite3.Connection) -> Dict[str, Any]:
             "status": "higher" if diff_pct > 10 else ("lower" if diff_pct < -10 else "on_track")
         }
 
+        # Enrich with natural language pace interpretation (Gemma or deterministic)
+        try:
+            cur.execute("SELECT value FROM user_settings WHERE key = 'tone'")
+            tone_row = cur.fetchone()
+            tone_val = tone_row[0] if tone_row else "playful"
+            from app.services.ai_generator import explain_spending_pace_with_ai
+            pace_explanation, pace_gen_by = explain_spending_pace_with_ai(current_month_pace, tone=tone_val)
+            current_month_pace["explanation"] = pace_explanation
+            current_month_pace["generated_by"] = pace_gen_by
+        except Exception:
+            pass
+
     return {
         "total_expenses": round(total_expenses, 2),
         "total_income": round(total_income, 2),
