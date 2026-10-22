@@ -169,3 +169,63 @@ To prevent calculation discrepancies between the briefing dashboard, deep analys
 2. **Deterministic Fallback**: If Ollama or any external process is offline, the system produces 100% of insights, summaries, and notifications with zero errors and zero latency degradation.
 3. **Zero Data Leakage**: Demo data and personal data reside in separate database files (`usually.db` vs `usually_demo.db`). Demo actions never mutate personal data.
 4. **Idempotent Ingestion**: Importing the same statement twice produces 0 new records, 0 duplicate balance shifts, and 100% duplicate rejection.
+
+---
+
+## 3. Comprehensive REST API Reference
+
+| Method | Endpoint | Description | Auth / Context |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/health` | System health, active context, Ollama reachability, tone | Public |
+| `GET` | `/` | API root, version, deployment mode | Public |
+| `GET` | `/api/summary` | Deterministic income, outflow, transfers, and spending pace | Session Context |
+| `GET` | `/api/habits` | Longitudinal recurring habit observations | Session Context |
+| `GET` | `/api/notifications` | Active habit notifications within the 30-day window | Session Context |
+| `GET` | `/api/transactions` | Paginated ledger with category, direction, and search filters | Session Context |
+| `POST` | `/api/transactions/import` | Multipart CSV/TSV statement import with deduplication | Personal Only |
+| `PUT` | `/api/transactions/{id}` | Edit transaction category, notes, or classification | Personal Only |
+| `GET` | `/api/learning/questions` | Pending ambiguous payee review questions | Personal Only |
+| `POST` | `/api/learning/questions/{id}/suggest` | Request on-demand Gemma classification for an ambiguous payee | Personal Only |
+| `POST` | `/api/learning/answer` | Confirm or correct a suggestion; writes to `learned_payees` | Personal Only |
+| `POST` | `/api/learning/dismiss/{id}` | Dismiss a payee question without saving a persistent rule | Personal Only |
+| `POST` | `/api/auth/guest` | Instant 1-click isolated guest workspace session | Public |
+| `POST` | `/api/auth/register` | Register an email/password account with PBKDF2 hashing | Public |
+| `POST` | `/api/auth/login` | Login to retrieve bearer session token | Public |
+| `DELETE`| `/api/auth/workspace` | Permanently unlink workspace SQLite `.db`, `-wal`, and `-shm` | Personal Only |
+
+---
+
+## 4. Extended Database Schemas
+
+```sql
+-- Persistent memory table (Zero-repeat inference)
+CREATE TABLE learned_payees (
+    payee_key TEXT PRIMARY KEY, -- Lowercase normalized merchant string
+    clean_name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    transaction_type TEXT NOT NULL DEFAULT 'expense',
+    notes TEXT,
+    user_classified INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- Payee review questions
+CREATE TABLE payee_questions (
+    id TEXT PRIMARY KEY,
+    payee_key TEXT NOT NULL,
+    payee_name TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    options_json TEXT NOT NULL,
+    transaction_count INTEGER NOT NULL,
+    total_amount REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'answered', 'dismissed'
+    suggested_category TEXT,
+    suggested_type TEXT,
+    ai_reason TEXT,
+    ai_confidence REAL,
+    suggested_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+```
