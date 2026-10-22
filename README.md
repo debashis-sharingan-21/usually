@@ -3,6 +3,10 @@
 > A quiet, local-first personal finance companion designed with a warm, editorial notebook aesthetic.
 > Themed **“Slow and Steady”** with a peaceful sloth identity.
 
+<p align="center">
+  <img src="docs/screenshots/usually-banner.jpg" alt="Usually — Your Money Has Habits. Usually Knows Them." width="100%" />
+</p>
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-365844.svg)](https://opensource.org/licenses/MIT)
 [![Backend Tests](https://img.shields.io/badge/Backend%20Tests-100%20Passed-365844.svg)](https://github.com/debashis-sharingan-21/usually)
 [![Frontend Tests](https://img.shields.io/badge/Frontend%20Tests-22%20Passed-365844.svg)](https://github.com/debashis-sharingan-21/usually)
@@ -39,6 +43,19 @@ Understanding personal finances usually forces an unwelcome tradeoff:
 
 ---
 
+## The Inspiration: An iPhone Battery Insight
+
+Usually began with a small interaction on my own iPhone: comparing today's battery usage with what is typical by the same time of day. That comparison inspired a similar question for personal finance: **what has my spending pace looked like so far, compared with my own history?**
+
+These original iPhone screenshots are the inspiration, not part of the Usually interface. The battery figures shown belong to the phone screenshot and are not financial data.
+
+<div align="center">
+  <img src="docs/screenshots/iphone-daily-usage-comparison.jpeg" alt="Original iPhone Daily Usage screen comparing battery use today with typical usage by 6:18 PM; the screenshot shows 16 percent today versus an 86 percent average." width="64%" />
+  <img src="docs/screenshots/iphone-app-system-activity.jpeg" alt="Original iPhone App and System Activity Usage explanation describing battery use by app and system activity throughout the day." width="80%" />
+</div>
+
+---
+
 ## Key Capabilities
 
 - **Evidence-Backed Recurring Rhythms:** Statistical cadence detection identifies recurring spending patterns (e.g., *“You usually spend ₹450 on Swiggy on Wednesdays”*) supported by dates, transaction frequencies, and historical evidence.
@@ -46,6 +63,24 @@ Understanding personal finances usually forces an unwelcome tradeoff:
 - **Local Gemma 2B Merchant Assistance:** Open-weight Google Gemma 2B running on-device via Ollama evaluates raw, messy bank descriptors and proposes standard categories without sending financial data over the network.
 - **Human-Confirmed Learning & Reuse:** AI suggestions are strictly candidate proposals (`Model estimate · Review required`). Once accepted or corrected by the user, the decision commits to `learned_payees` as an authoritative rule.
 - **Inspectable Ledger & Statement Ingestion:** Resilient, filename-agnostic parser supporting standard CSV, TSV, and PhonePe exports with content-addressable SHA-256 deduplication, category filtering, search, and inline correction.
+
+---
+
+## Visual Experience & Views
+
+### Application Previews
+
+These screenshots show the Usually product story, financial analysis, statement import, and workspace controls. Import and analysis examples use synthetic demo data.
+
+<div align="center">
+  <img src="docs/screenshots/story-behind-usually.png" alt="The Story Behind Usually product guide introducing its core philosophy and workflow." width="48%" />
+  <img src="docs/screenshots/financial-analysis.png" alt="Usually financial analysis view with cash-flow reconciliation and a spending-pace comparison against a historical baseline." width="48%" />
+</div>
+
+<div align="center">
+  <img src="docs/screenshots/statement-import-success.png" alt="Usually statement import confirmation for 200 synthetic demo transactions, including accepted, duplicate, rejected, coverage, and total summaries." width="62%" />
+  <img src="docs/screenshots/workspace-tone-settings.png" alt="Usually workspace and tone settings showing observation style, shared read-only demo database, record count, and AI engine configuration." width="30%" />
+</div>
 
 ---
 
