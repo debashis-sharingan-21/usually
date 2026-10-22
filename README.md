@@ -21,6 +21,7 @@ Usually is **not** a generic expense tracker, a spreadsheet clone, or an intrusi
 ## Quick Links
 
 - **Live Web Application:** [https://usually-tau.vercel.app/](https://usually-tau.vercel.app/)
+- [Website Walkthrough](https://youtu.be/1R1HhzmjI7o)
 - **Live Cloud Backend:** [https://usually.onrender.com/](https://usually.onrender.com/) (Health: [/health](https://usually.onrender.com/health))
 - **GitHub Repository:** [https://github.com/debashis-sharingan-21/usually](https://github.com/debashis-sharingan-21/usually)
 - **Interactive Product Story:** Click the **About** pill in the application navbar on any page to open *“The Story Behind Usually”*.
