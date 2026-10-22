@@ -5,9 +5,10 @@ import { StatementProvider, useStatement } from '@/context/StatementContext';
 import { Navbar } from './Navbar';
 import { NotebookFooter } from './NotebookFooter';
 import { CSVImportModal } from './CSVImportModal';
+import { AboutModal } from './AboutModal';
 
 const ShellContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isImportOpen, setIsImportOpen, handleImportSuccess } = useStatement();
+  const { isImportOpen, setIsImportOpen, handleImportSuccess, isAboutOpen, setIsAboutOpen } = useStatement();
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F7F5EE] text-[#292D29] notebook-ruled selection:bg-[#E8C95D]/60 selection:text-[#292D29] relative overflow-x-hidden">
@@ -37,6 +38,12 @@ const ShellContent: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         isOpen={isImportOpen}
         onClose={() => setIsImportOpen(false)}
         onImportSuccess={handleImportSuccess}
+      />
+
+      {/* Shared About / Story Modal */}
+      <AboutModal
+        isOpen={isAboutOpen}
+        onClose={() => setIsAboutOpen(false)}
       />
     </div>
   );

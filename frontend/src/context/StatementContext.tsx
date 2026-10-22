@@ -55,6 +55,8 @@ interface StatementContextType {
   isAuthModalOpen: boolean;
   setIsAuthModalOpen: (open: boolean) => void;
   setIsImportOpen: (open: boolean) => void;
+  isAboutOpen: boolean;
+  setIsAboutOpen: (open: boolean) => void;
   loadAll: () => Promise<void>;
   handleToneChange: (tone: 'playful' | 'dry' | 'minimal') => Promise<void>;
   handleSwitchContext: (targetContext: 'personal' | 'demo') => Promise<void>;
@@ -79,6 +81,7 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isDemoLoading, setIsDemoLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserState | null>(null);
@@ -383,6 +386,8 @@ export const StatementProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isAuthModalOpen,
         setIsAuthModalOpen,
         setIsImportOpen,
+        isAboutOpen,
+        setIsAboutOpen,
         loadAll,
         handleToneChange,
         handleSwitchContext,
