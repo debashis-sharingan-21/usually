@@ -8,7 +8,7 @@ import gsap from 'gsap';
 import { isReducedMotion, observeViewportReveal } from '@/lib/motion';
 
 export const NotebookFooter: React.FC = () => {
-  const { setIsImportOpen } = useStatement();
+  const { setIsImportOpen, setIsAboutOpen, isAboutOpen } = useStatement();
   const [isHovered, setIsHovered] = useState(false);
   const footerRef = useRef<HTMLElement>(null);
   const hasAnimatedRef = useRef(false);
@@ -264,7 +264,7 @@ export const NotebookFooter: React.FC = () => {
             aria-label="Notebook Index"
             className="footer-notebook-index w-full sm:w-[252px] vintage-notebook-paper border border-[#DFD9CA] rounded-r-lg rounded-l-xs vintage-notebook-shadow relative overflow-hidden select-none shrink-0"
           >
-            <div className="flex min-h-[178px]">
+            <div className="flex min-h-[208px]">
               {/* Left Sage Cloth Binding Spine Detail */}
               <div
                 className="w-3.5 bg-[#8FA882] border-r border-[#768C69]/60 shrink-0 relative flex flex-col justify-around py-3"
@@ -292,7 +292,7 @@ export const NotebookFooter: React.FC = () => {
                   <span className="font-mono text-[9px] text-[#8A928A]">p. 01</span>
                 </div>
 
-                {/* 4 Preserved Navigation Links */}
+                {/* 5 Preserved Navigation Links */}
                 <ul className="space-y-1 text-xs font-sans">
                   <li className="flex items-center h-[26px]">
                     <span className="w-5 font-mono text-[10px] text-[#A2A89E] pr-1.5 text-right select-none" aria-hidden="true">
@@ -330,6 +330,21 @@ export const NotebookFooter: React.FC = () => {
                   <li className="flex items-center h-[26px]">
                     <span className="w-5 font-mono text-[10px] text-[#A2A89E] pr-1.5 text-right select-none" aria-hidden="true">
                       04
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsAboutOpen(true)}
+                      className="pl-2.5 flex-1 py-0.5 text-left text-[#292D29] hover:text-[#365844] hover:translate-x-0.5 transition-all duration-150 cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#365844] rounded-xs font-medium"
+                      aria-haspopup="dialog"
+                      aria-expanded={isAboutOpen}
+                      aria-label="About Usually"
+                    >
+                      About
+                    </button>
+                  </li>
+                  <li className="flex items-center h-[26px]">
+                    <span className="w-5 font-mono text-[10px] text-[#A2A89E] pr-1.5 text-right select-none" aria-hidden="true">
+                      05
                     </span>
                     <button
                       type="button"

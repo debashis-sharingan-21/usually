@@ -51,3 +51,29 @@ export function validateAboutContent(): boolean {
   }
   return true;
 }
+
+export interface NotebookIndexItem {
+  readonly number: string;
+  readonly label: string;
+  readonly type: 'link' | 'modal';
+  readonly target: string;
+  readonly ariaLabel: string;
+}
+
+export const NOTEBOOK_INDEX_ITEMS: readonly NotebookIndexItem[] = [
+  { number: '01', label: 'Home Briefing', type: 'link', target: '/', ariaLabel: 'Home Briefing' },
+  { number: '02', label: 'Financial Analysis', type: 'link', target: '/analysis', ariaLabel: 'Financial Analysis' },
+  { number: '03', label: 'Verified Ledger', type: 'link', target: '/transactions', ariaLabel: 'Verified Ledger' },
+  { number: '04', label: 'About', type: 'modal', target: 'about', ariaLabel: 'About Usually' },
+  { number: '05', label: 'Import Statement', type: 'modal', target: 'import', ariaLabel: 'Import Statement' },
+] as const;
+
+export function validateNotebookIndex(): boolean {
+  if (NOTEBOOK_INDEX_ITEMS.length !== 5) return false;
+  if (NOTEBOOK_INDEX_ITEMS[0].number !== '01' || NOTEBOOK_INDEX_ITEMS[0].target !== '/') return false;
+  if (NOTEBOOK_INDEX_ITEMS[1].number !== '02' || NOTEBOOK_INDEX_ITEMS[1].target !== '/analysis') return false;
+  if (NOTEBOOK_INDEX_ITEMS[2].number !== '03' || NOTEBOOK_INDEX_ITEMS[2].target !== '/transactions') return false;
+  if (NOTEBOOK_INDEX_ITEMS[3].number !== '04' || NOTEBOOK_INDEX_ITEMS[3].target !== 'about') return false;
+  if (NOTEBOOK_INDEX_ITEMS[4].number !== '05' || NOTEBOOK_INDEX_ITEMS[4].target !== 'import') return false;
+  return true;
+}
